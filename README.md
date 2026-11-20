@@ -17,7 +17,7 @@ The demo login is client-side and is not authentication for a real account. The 
 2. In Vercel, import that repository. Keep the project root at `.` and deploy; `vercel.json` routes `/api/analyze` to the included Node function.
 3. Share the resulting Vercel URL. Demo credentials are the same as above.
 
-No build command or environment variables are required. Use `vercel dev` for local testing because it serves the API function too; opening `index.html` directly will not run `/api/analyze`.
+No build command or environment variables are required. Vercel detects the Node.js endpoint under `api/` automatically. Use `vercel dev` for local testing because it serves the API function too; opening `index.html` directly will not run `/api/analyze`.
 
 ## What the demo model does
 
