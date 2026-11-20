@@ -1,5 +1,14 @@
 // A compact multinomial Naive Bayes text classifier. The example corpus is
 // intentionally bundled so the demo runs on Vercel without model downloads.
+const { createClerkClient } = require("@clerk/backend");
+
+const authorizedParties = [
+  "https://jobshield-fake-job-detection.vercel.app",
+  "https://jobshield-fake-job-detection-simoneanand0-web.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173"
+];
+
 const samples = [
   [1,"Senior software engineer build scalable applications collaborate product team competitive salary health insurance apply through company careers page"],
   [1,"Registered nurse full time hospital experience required benefits paid leave submit resume to hr department"],
@@ -62,8 +71,26 @@ function classify(text) {
   ].filter(([re])=>re.test(text)).map(([,label])=>label);
   return {risk, verdict:risk>=65?"Likely suspicious":risk>=40?"Needs careful review":"Lower risk signals", confidence:Math.round(Math.max(risk,100-risk)), redFlags, signals:words.length, model:"Multinomial Naive Bayes", trainingExamples:docs.length};
 }
-module.exports = (req,res) => {
+module.exports = async (req,res) => {
   if (req.method !== "POST") return res.status(405).json({error:"Use POST"});
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.CLERK_PUBLISHABLE_KEY;
+  if (!secretKey || !publishableKey) return res.status(503).json({error:"Account sign-in is not configured yet."});
+  const bearer = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
+  if (!bearer) return res.status(401).json({error:"Sign in to analyze a listing."});
+  try {
+    const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+    const forwardedProto = String(req.headers["x-forwarded-proto"] || (forwardedHost.startsWith("localhost") ? "http" : "https")).split(",")[0].trim();
+    if (!forwardedHost) return res.status(400).json({error:"Could not identify the application host."});
+    const headers = new Headers({authorization:`Bearer ${bearer[1]}`});
+    if (req.headers.origin) headers.set("origin", String(req.headers.origin));
+    const webRequest = new Request(new URL(req.url || "/api/analyze", `${forwardedProto}://${forwardedHost}`), {method:"POST", headers});
+    const clerk = createClerkClient({secretKey, publishableKey});
+    const authState = await clerk.authenticateRequest(webRequest, {authorizedParties});
+    if (!authState.isAuthenticated) return res.status(401).json({error:"Your session expired. Sign in again to continue."});
+  } catch {
+    return res.status(401).json({error:"Your session expired. Sign in again to continue."});
+  }
   const text=String((req.body||{}).text||"").slice(0,12000).trim();
   if (text.length < 35) return res.status(400).json({error:"Paste at least a few sentences from the job listing (35 characters minimum)."});
   return res.status(200).json(classify(text));

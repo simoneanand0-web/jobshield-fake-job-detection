@@ -1,1 +1,1 @@
-{"name":"jobshield-demo","version":"1.0.0","private":true,"scripts":{"dev":"vercel dev"}}
+{"name":"jobshield-demo","version":"1.0.0","private":true,"engines":{"node":">=20.9.0"},"scripts":{"dev":"vercel dev"},"dependencies":{"@clerk/backend":"^3.31.0"}}
