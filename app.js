@@ -20,7 +20,7 @@ function mountSignIn() {
     signUpFallbackRedirectUrl: location.origin,
     appearance: {
       variables: {
-        colorPrimary: '#216b50', colorText: '#18332b', colorTextSecondary: '#728279',
+        colorPrimary: '#6259e8', colorText: '#1b2140', colorTextSecondary: '#777b96',
         colorBackground: '#ffffff', borderRadius: '8px', fontFamily: 'DM Sans, sans-serif'
       }
     }
@@ -323,7 +323,7 @@ function attachFeedback() {
 }
 
 function render(result, options = {}) {
-  const color = result.risk >= 65 ? '#dc8167' : result.risk >= 40 ? '#d7a656' : '#5da77a';
+  const color = result.risk >= 65 ? '#e77872' : result.risk >= 40 ? '#e1a748' : '#43b9ad';
   const flags = result.redFlags?.length
     ? result.redFlags.map(flag => `<div class="flag"><span>&#9650;</span>${escapeHtml(flag)}</div>`).join('')
     : '<div class="flag clear"><span>&#10003;</span>No strong scam patterns found in the text</div>';
@@ -354,7 +354,7 @@ function showHistory() {
   if (!items.length) {
     list.innerHTML = '<div class="history-empty"><b>No saved checks yet</b><span>After an analysis, its summary appears here. Listing text is never saved.</span></div>';
   } else {
-    list.innerHTML = items.map(item => `<button class="history-row" data-history-id="${escapeHtml(item.id)}"><span class="history-score" style="--score-color:${item.risk >= 65 ? '#dc8167' : item.risk >= 40 ? '#d7a656' : '#5da77a'}">${item.risk}</span><span class="history-copy"><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.verdict)} · ${new Date(item.checkedAt).toLocaleString()}</small></span><span class="history-open">View</span></button>`).join('');
+    list.innerHTML = items.map(item => `<button class="history-row" data-history-id="${escapeHtml(item.id)}"><span class="history-score" style="--score-color:${item.risk >= 65 ? '#e77872' : item.risk >= 40 ? '#e1a748' : '#43b9ad'}">${item.risk}</span><span class="history-copy"><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.verdict)} · ${new Date(item.checkedAt).toLocaleString()}</small></span><span class="history-open">View</span></button>`).join('');
     list.querySelectorAll('[data-history-id]').forEach(button => {
       button.onclick = () => {
         const selected = items.find(item => item.id === button.dataset.historyId);
