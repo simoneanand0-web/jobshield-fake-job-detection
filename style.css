@@ -83,12 +83,12 @@
 
 /* JobShield visual refresh: midnight, violet, and mint */
 :root {
-  --ink:#1b2140;
-  --muted:#777b96;
-  --green:#6259e8;
-  --lime:#a6f2e4;
-  --paper:#f6f5fb;
-  --line:#e8e7f1;
+  --ink:#2a2a2a;
+  --muted:#777777;
+  --green:#ff6f61;
+  --lime:#ffb347;
+  --paper:#fafafa;
+  --line:#dddddd;
 }
 body { background:radial-gradient(ellipse at 82% 8%,#eeebff 0,transparent 35%),#f6f5fb; color:#1b2140; }
 .login { grid-template-columns:minmax(390px,.95fr) minmax(420px,1.05fr); background:linear-gradient(135deg,#fbfaff,#f2f0ff); }
@@ -298,3 +298,83 @@ body { background:radial-gradient(ellipse at 82% 8%,#eeebff 0,transparent 35%),#
   .model-card { max-height:86vh; }
   .model-badge { margin-top:14px; }
 }
+/* ==== Enhanced Visuals ==== */
+
+/* Animated gradient background */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+body {
+  background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #a1c4fd, #c2e9fb);
+  background-size: 400% 400%;
+  animation: gradientShift 20s ease infinite;
+}
+
+/* Glass‑morphism cards */
+.input-card, .result-card, .how-card {
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.3);
+  backdrop-filter: blur(12px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.input-card:hover, .result-card:hover, .how-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* Neon brand icon */
+.brand-icon {
+  box-shadow: 0 0 12px 4px rgba(255,111,97,0.6), 0 0 20px 8px rgba(255,179,71,0.5);
+  animation: pulseGlow 3s infinite alternate;
+}
+@keyframes pulseGlow {
+  from { box-shadow: 0 0 12px 4px rgba(255,111,97,0.4), 0 0 20px 8px rgba(255,179,71,0.3); }
+  to   { box-shadow: 0 0 20px 8px rgba(255,111,97,0.8), 0 0 30px 12px rgba(255,179,71,0.6); }
+}
+
+/* Enhanced button interactions */
+.primary {
+  transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+/* Subtle shield animation – add rotation */
+@keyframes shieldFloatRotate {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  50%       { transform: translateY(-7px) rotate(3deg); }
+}
+.aside-graphic svg {
+  animation: shieldFloatRotate 5s ease-in-out infinite;
+}
+
+/* Navbar hover effect */
+.nav {
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.nav:hover {
+  background: rgba(255,255,255,0.9);
+  transform: translateX(4px);
+}
+
+/* Particle sparkle effect (simple) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.2) 0%, transparent 20%),
+              radial-gradient(circle at 80% 70%, rgba(255,255,255,0.15) 0%, transparent 25%);
+  animation: sparkle 8s linear infinite;
+}
+@keyframes sparkle {
+  0% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.6; }
+}
+
+/* End of enhanced visuals */
