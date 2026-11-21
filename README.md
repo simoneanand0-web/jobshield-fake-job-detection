@@ -1,23 +1,30 @@
 # JobShield - Fake Job Post Detection
 
-JobShield is a student project demo for screening suspicious job listings. It includes a responsive website, real account registration through Clerk, a Vercel serverless prediction endpoint, and a local Python experiment for comparing classifiers.
+JobShield is a student project demo for screening suspicious job listings. It has Clerk sign-in/sign-up, a Vercel analysis API, explainable warning signals, model comparisons, URL text import, per-user browser history, report downloads, and local feedback controls.
+
+## Features
+
+- **Explainable results:** highlights matched warning phrases and gives a suggested verification step. It can also point out some ordinary job details, such as benefits or a company careers page.
+- **Classifier comparison:** compares Naive Bayes, Logistic Regression, Linear SVM, and a soft-voting ensemble. Accuracy, precision, recall, F1, and confusion-matrix counts are calculated with five-fold cross-validation on the bundled corpus.
+- **Listing URL import:** signed-in users can ask the server to read a public HTTPS listing page and extract visible text. Some sites block automated requests or render listings in the browser; when import fails, paste the job description manually. Import is bounded by a timeout and response-size limit and rejects private network destinations.
+- **Recent checks:** the browser saves up to 25 summaries under the signed-in Clerk user ID. It does not save the full job description; URLs are stored without query parameters.
+- **Downloadable report:** saves a plain-text summary with the assessment, matched signals, and demo model metrics. It does not include the full listing text.
+- **Feedback:** helpful/not-helpful choices and an optional reason are saved only in the current browser. Feedback is not sent to a server or used to retrain the classifier.
 
 ## Account registration and sign-in
 
-The website uses Clerk to create and manage user accounts. Sign-up and sign-in are available in the same authentication panel. The analysis API verifies a Clerk session token on the server before returning a result.
+The website uses Clerk to create and manage user accounts. Sign-up and sign-in are available in the same authentication panel. The analysis and URL-import APIs verify the Clerk session token on the server.
 
 ### Connect Clerk to the live Vercel project
 
-1. Create a Clerk application at [clerk.com](https://clerk.com/) and enable email sign-up/sign-in. Keep account creation enabled.
-2. For this demo's `*.vercel.app` address, use the Clerk **Development** instance and copy its **Publishable key** (`pk_test_...`) and **Secret key** (`sk_test_...`). Clerk development keys work with hosting-provider preview domains; development accounts are capped at 100 users and include a development banner.
+1. Create a Clerk application at [clerk.com](https://clerk.com/) and enable email sign-up/sign-in.
+2. For this demo's `*.vercel.app` address, use the Clerk **Development** instance and copy its **Publishable key** (`pk_test_...`) and **Secret key** (`sk_test_...`). Clerk development keys are intended for testing; production keys require a domain you own.
 3. In Vercel, open the `jobshield-fake-job-detection` project, then go to **Settings -> Environment Variables**.
-4. Add `CLERK_PUBLISHABLE_KEY` with the Publishable key, and `CLERK_SECRET_KEY` with the Secret key. Select **Production** (and Preview too, if you plan to use preview deployments). Never put the Secret key in frontend code or GitHub.
+4. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` with the publishable key, and `CLERK_SECRET_KEY` with the secret key. Select **Production** (and Preview too, if you use preview deployments). Never put the secret key in frontend code or GitHub.
 5. Redeploy the latest version so the serverless functions receive both variables.
-6. Open the production URL and select the sign-up link below the sign-in form. New users can register with their email and verify it using Clerk's configured flow.
+6. Open the production URL and select **Sign up** below the sign-in form.
 
-You can also use Clerk's Vercel Marketplace integration to provision the same keys. The app accepts `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as an alternative to `CLERK_PUBLISHABLE_KEY`; the secret must remain `CLERK_SECRET_KEY`. For a production identity service on Clerk, you must use a domain you own and Clerk Production keys; Clerk does not support production keys on `*.vercel.app` domains.
-
-For local development, copy `.env.example` to `.env.local`, fill in your Clerk development keys, and run `vercel dev`. Do not commit `.env.local` or share the Secret key in chat.
+For local development, copy `.env.example` to `.env.local`, fill in Clerk development keys, and run `vercel dev`. Do not commit `.env.local` or share the secret key.
 
 ## Run locally
 
@@ -25,46 +32,30 @@ For local development, copy `.env.example` to `.env.local`, fill in your Clerk d
 2. Run `npm install` and `vercel dev` in this folder.
 3. Open the local URL printed by Vercel. The Clerk instance must allow the local origin (`http://localhost:3000` or `http://localhost:5173`).
 
-Opening `index.html` directly will not run the API. The deployed site also needs both Clerk environment variables before registration and analysis can work.
+Opening `index.html` directly will not run the APIs. The deployed site also needs both Clerk environment variables before registration, analysis, and URL import can work.
 
-## Deploy
+## Demo model limitations
 
-Push the project files to GitHub, import the repository into Vercel (or update the existing project), set the Clerk environment variables, and redeploy. Vercel detects the Node function under `api/` automatically.
+`api/analyze.js` compares four JavaScript classifiers using five-fold cross-validation on 40 illustrative examples: 20 legitimate-style and 20 scam-style. Metrics are useful for demonstrating evaluation terms and code flow, but this corpus is too small and synthetic to support claims about real-world detection performance. A low risk score does not prove a listing is safe. Always verify the employer through independently located official channels.
 
-## What the demo model does
-
-`api/analyze.js` trains a compact multinomial Naive Bayes text classifier at cold start from 40 illustrative examples (20 legitimate-style and 20 scam-style). It tokenizes listing text, scores it with Laplace-smoothed word likelihoods, and returns a risk score, verdict, and matching warning patterns. These examples are teaching/demo material, not a representative benchmark. A low score does not prove a listing is safe.
-
-The URL field is saved as context for a presentation but the browser does not crawl arbitrary job boards. Paste the job description into the text box. Job sites commonly block third-party page reads; a production crawler needs a permitted source, secure extraction, and review.
-
-## Research / classifier comparison
-
-`train_models.py` trains TF-IDF text models on a labeled CSV and compares Multinomial Naive Bayes, Logistic Regression, Linear SVM, Random Forest, and a soft-voting ensemble using a stratified holdout. It prints accuracy, precision, recall, F1, and ROC-AUC (where supported), then saves the best F1 model and metrics. It expects columns named `text` and `fraudulent`; use a dataset you are allowed to use and inspect its label coding first.
+`train_models.py` is a separate offline experiment that trains TF-IDF models on a labeled CSV and compares Multinomial Naive Bayes, Logistic Regression, Linear SVM, Random Forest, and a soft-voting ensemble. It expects columns named `text` and `fraudulent`; inspect the dataset's label coding first.
 
 ```powershell
 python -m pip install -r requirements.txt
 python train_models.py --data job_posts.csv --output model_artifacts
 ```
 
-This offline training artifact is for experimentation and report writing; it is not wired into the Vercel demo endpoint. The hosted app uses its tiny illustrative corpus. Replace the endpoint classifier with a properly hosted model before claiming production performance.
+The offline training artifact is not wired into the Vercel endpoint. Use a permitted, representative labeled dataset and a properly hosted model before claiming production performance.
 
 ## Project abstract
 
-Online employment scams can exploit job seekers through misleading offers, requests for advance payments, identity theft, and fraudulent money-transfer schemes. JobShield demonstrates a machine-learning-based screening workflow for job descriptions. The web application accepts listing text, applies a multinomial Naive Bayes text classifier, and surfaces matching warning patterns to help users decide what to verify. An offline experiment compares single classifiers and a soft-voting ensemble using standard classification metrics. The system is decision support: its demonstration corpus is small and illustrative, and every result should be checked against the employer's official channels.
-
-## Suggested presentation outline
-
-1. Problem and motivation: online job fraud and risks to applicants.
-2. Objective: prioritize suspicious listings for human review.
-3. Method: text cleaning, TF-IDF features, supervised classifiers, stratified holdout.
-4. Demo: register or sign in, analyze the sample scam, then analyze a conventional listing.
-5. Evaluation: report precision, recall, F1, ROC-AUC, confusion matrix, and class balance from your chosen dataset. Do not use demo scores as scientific results.
-6. Limitations and future work: representative labeled data, temporal drift, multilingual text, calibration, source verification, and privacy.
+Online employment scams can exploit job seekers through misleading offers, requests for advance payments, identity theft, and fraudulent money-transfer schemes. JobShield demonstrates a machine-learning screening workflow for job descriptions. The website accepts pasted or imported listing text, compares several classifiers, and explains matched warning patterns to help users decide what to verify. Its evaluation data is small and illustrative; results are decision-support estimates and must be checked against the employer's official channels.
 
 ## Files
 
-- `index.html`, `style.css`, `app.js` - responsive frontend with Clerk account registration.
+- `index.html`, `style.css`, `app.js` - responsive frontend, Clerk account flow, explanations, comparison display, browser history, reports, and local feedback.
 - `api/auth-config.js` - provides only the public Clerk key to the browser.
-- `api/analyze.js` - verifies the signed-in user's Clerk session, then runs the demo Naive Bayes prediction.
-- `train_models.py` - local classifier comparison and artifact export.
+- `api/analyze.js` - verifies the signed-in user, classifies the listing, and calculates cross-validation comparisons.
+- `api/extract.js` - verifies the signed-in user and imports visible text from eligible public HTTPS pages.
+- `train_models.py` - separate local classifier comparison and artifact export.
 - `vercel.json` - Vercel configuration.

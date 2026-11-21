@@ -1,5 +1,5 @@
-// A compact multinomial Naive Bayes text classifier. The example corpus is
-// intentionally bundled so the demo runs on Vercel without model downloads.
+// Educational scam detector built from a small illustrative corpus. Its
+// estimates are signals for review, not proof that a listing is genuine/fake.
 const { createClerkClient } = require("@clerk/backend");
 
 const authorizedParties = [
@@ -51,47 +51,195 @@ const samples = [
   [0,"Amazing salary for easy work no interview required purchase our mandatory starter package"],
   [0,"Urgent opportunity send your identity documents and account number before we reveal employer"]
 ];
-const tokenize = s => (s.toLowerCase().match(/[a-z0-9]+/g) || []).filter(w => w.length > 1);
+
+const tokenize = value => (String(value).toLowerCase().match(/[a-z0-9]+/g) || []).filter(word => word.length > 1);
 const stop = new Set("the and for with from your this that are our you will have into through their about work job role team".split(" "));
-const docs = samples.map(([label, text]) => ({label, words:tokenize(text).filter(w=>!stop.has(w))}));
-const vocab = new Set(docs.flatMap(d=>d.words));
-const counts = [new Map(),new Map()], totals=[0,0], prior=[0,0];
-for (const d of docs) { prior[d.label]++; for (const w of d.words) { counts[d.label].set(w,(counts[d.label].get(w)||0)+1); totals[d.label]++; } }
-function classify(text) {
-  const words=tokenize(text).filter(w=>!stop.has(w));
-  const scores=prior.map((n,c)=>Math.log(n/docs.length)+words.reduce((sum,w)=>sum+Math.log(((counts[c].get(w)||0)+1)/(totals[c]+vocab.size)),0));
-  const max=Math.max(...scores), p=scores.map(s=>Math.exp(s-max));
-  const risk=Math.round(p[0]/(p[0]+p[1])*100);
-  const redFlags=[
-    [/(upfront|registration|training|application|starter|processing) fee|pay .* fee|deposit .* (fee|money)/i,"Requests an upfront payment"],
-    [/(bank (account|login|details)|banking information|social security|passport|identity documents)/i,"Requests sensitive financial or identity details"],
-    [/(no experience|no skills|no qualifications).{0,45}(high|huge|guaranteed|easy|\$|income|weekly|hour)/i,"Promises unusually high pay with few requirements"],
-    [/(cashier check|gift cards|crypto|cryptocurrency|reship|forward parcels|money transfer)/i,"Mentions a common payment or reshipping scam pattern"],
-    [/(without interview|no interview|hire instantly|instant hiring|guaranteed job)/i,"Claims hiring without a normal interview process"]
-  ].filter(([re])=>re.test(text)).map(([,label])=>label);
-  return {risk, verdict:risk>=65?"Likely suspicious":risk>=40?"Needs careful review":"Lower risk signals", confidence:Math.round(Math.max(risk,100-risk)), redFlags, signals:words.length, model:"Multinomial Naive Bayes", trainingExamples:docs.length};
+const vectorize = value => tokenize(value).filter(word => !stop.has(word));
+const labeledDocs = samples.map(([label, text]) => ({label, words:vectorize(text)}));
+
+function sigmoid(value) {
+  if (value > 30) return 1;
+  if (value < -30) return 0;
+  return 1 / (1 + Math.exp(-value));
 }
-module.exports = async (req,res) => {
-  if (req.method !== "POST") return res.status(405).json({error:"Use POST"});
+
+function trainNaiveBayes(training) {
+  const wordCounts = [new Map(), new Map()];
+  const totals = [0, 0];
+  const classCounts = [0, 0];
+  const vocab = new Set();
+  for (const doc of training) {
+    const fake = doc.label === 0 ? 1 : 0;
+    classCounts[fake]++;
+    for (const word of doc.words) {
+      vocab.add(word);
+      wordCounts[fake].set(word, (wordCounts[fake].get(word) || 0) + 1);
+      totals[fake]++;
+    }
+  }
+  const size = Math.max(vocab.size, 1);
+  return words => {
+    let fake = Math.log((classCounts[1] + 1) / (training.length + 2));
+    let genuine = Math.log((classCounts[0] + 1) / (training.length + 2));
+    for (const word of words) {
+      fake += Math.log(((wordCounts[1].get(word) || 0) + 1) / (totals[1] + size));
+      genuine += Math.log(((wordCounts[0].get(word) || 0) + 1) / (totals[0] + size));
+    }
+    return sigmoid(fake - genuine);
+  };
+}
+
+function trainLinear(training, kind) {
+  const vocab = [...new Set(training.flatMap(doc => doc.words))];
+  const index = new Map(vocab.map((word, i) => [word, i]));
+  const weights = new Float64Array(vocab.length);
+  let bias = 0;
+  const passes = kind === "svm" ? 36 : 100;
+  const rate = kind === "svm" ? 0.025 : 0.12;
+  for (let pass = 0; pass < passes; pass++) {
+    for (const doc of training) {
+      const indices = [...new Set(doc.words.map(word => index.get(word)).filter(value => value !== undefined))];
+      const target = doc.label === 0 ? 1 : 0;
+      let score = bias;
+      for (const i of indices) score += weights[i];
+      if (kind === "svm") {
+        const y = target ? 1 : -1;
+        if (y * score < 1) {
+          for (let i = 0; i < weights.length; i++) weights[i] *= 1 - rate * 0.001;
+          for (const i of indices) weights[i] += rate * y;
+          bias += rate * y;
+        }
+      } else {
+        const error = target - sigmoid(score);
+        for (let i = 0; i < weights.length; i++) weights[i] *= 1 - rate * 0.0008;
+        for (const i of indices) weights[i] += rate * error;
+        bias += rate * error;
+      }
+    }
+  }
+  return words => {
+    let score = bias;
+    for (const word of words) {
+      const i = index.get(word);
+      if (i !== undefined) score += weights[i];
+    }
+    return kind === "svm" ? sigmoid(score * 1.25) : sigmoid(score);
+  };
+}
+
+function trainEnsemble(training) {
+  const models = [trainNaiveBayes(training), trainLinear(training, "logistic"), trainLinear(training, "svm")];
+  return words => models.reduce((sum, model) => sum + model(words), 0) / models.length;
+}
+
+const modelTypes = [
+  {key:"naiveBayes", name:"Naive Bayes"},
+  {key:"logistic", name:"Logistic Regression"},
+  {key:"svm", name:"Linear SVM"},
+  {key:"ensemble", name:"Ensemble"}
+];
+const trainers = {
+  naiveBayes:trainNaiveBayes,
+  logistic:training => trainLinear(training, "logistic"),
+  svm:training => trainLinear(training, "svm"),
+  ensemble:trainEnsemble
+};
+
+function evaluateModel(key) {
+  const matrix = {tp:0, fp:0, fn:0, tn:0};
+  const folds = 5;
+  for (let fold = 0; fold < folds; fold++) {
+    const training = labeledDocs.filter((_, i) => i % folds !== fold);
+    const validation = labeledDocs.filter((_, i) => i % folds === fold);
+    const predict = trainers[key](training);
+    for (const doc of validation) {
+      const predictedFake = predict(doc.words) >= 0.5;
+      const actualFake = doc.label === 0;
+      if (actualFake && predictedFake) matrix.tp++;
+      else if (!actualFake && predictedFake) matrix.fp++;
+      else if (actualFake && !predictedFake) matrix.fn++;
+      else matrix.tn++;
+    }
+  }
+  const precision = matrix.tp / Math.max(matrix.tp + matrix.fp, 1);
+  const recall = matrix.tp / Math.max(matrix.tp + matrix.fn, 1);
+  return {
+    accuracy:Math.round((matrix.tp + matrix.tn) / labeledDocs.length * 100),
+    precision:Math.round(precision * 100),
+    recall:Math.round(recall * 100),
+    f1:Math.round(2 * precision * recall / Math.max(precision + recall, 0.0001) * 100),
+    confusionMatrix:matrix
+  };
+}
+const comparison = modelTypes.map(model => ({...model, ...evaluateModel(model.key)}));
+const fullModels = [trainNaiveBayes(labeledDocs), trainLinear(labeledDocs, "logistic"), trainLinear(labeledDocs, "svm")];
+
+const scamRules = [
+  {pattern:/(?:upfront|registration|training|application|starter|processing)\s+fee|pay.{0,24}fee|deposit.{0,24}(?:fee|money)/i, label:"Requests an upfront payment", advice:"Do not pay to apply. Check the employer's official careers page and contact details."},
+  {pattern:/bank\s+(?:account|login|details)|banking information|social security|passport|identity documents/i, label:"Requests sensitive financial or identity details", advice:"Do not share banking credentials or identity documents before verifying the employer and the hiring stage."},
+  {pattern:/(?:no experience|no skills|no qualifications).{0,65}(?:high|huge|guaranteed|easy|\$|income|weekly|hour)|(?:\$\s?\d[\d,]*|\d[\d,]*\s?(?:dollars|usd))\s?(?:per|\/)?\s?(?:hour|week).{0,55}(?:no experience|no skills|no qualifications)/i, label:"Pairs unusually high pay with few requirements", advice:"Compare the pay and duties with the employer's official posting and similar roles."},
+  {pattern:/cashier check|gift cards|crypto|cryptocurrency|reship|forward parcels|money transfer/i, label:"Mentions a payment or reshipping scam pattern", advice:"Never deposit a check, buy gift cards, move money, or forward parcels for a recruiter."},
+  {pattern:/without interview|no interview|hire instantly|instant hiring|guaranteed job/i, label:"Claims hiring without a normal interview process", advice:"Verify the hiring process using contact details from the company's official website."}
+];
+const positiveRules = [
+  {pattern:/health insurance|medical benefits|retirement plan|401\s?k|paid leave|paid vacation/i, label:"Lists standard employment benefits"},
+  {pattern:/salary range|\$\s?\d[\d,]*\s?(?:-|to)\s?\$?\s?\d|equal opportunity employer/i, label:"Includes specific compensation or equal-opportunity details"},
+  {pattern:/apply through (?:the )?(?:company|official) careers page|company careers page|official careers page/i, label:"Directs applicants to an official careers page"}
+];
+
+function evidenceFrom(text, rules) {
+  return rules.flatMap(rule => {
+    const match = text.match(rule.pattern);
+    return match ? [{label:rule.label, evidence:match[0].trim().slice(0, 140), ...(rule.advice ? {advice:rule.advice} : {})}] : [];
+  });
+}
+
+function classify(text) {
+  const words = vectorize(text);
+  const probabilities = fullModels.map(model => model(words));
+  const risk = Math.round(probabilities.reduce((sum, probability) => sum + probability, 0) / probabilities.length * 100);
+  const scamEvidence = evidenceFrom(text, scamRules);
+  const positiveSignals = evidenceFrom(text, positiveRules);
+  return {
+    risk,
+    verdict:risk >= 65 ? "Likely suspicious" : risk >= 40 ? "Needs careful review" : "Lower risk signals",
+    confidence:Math.round(Math.max(risk, 100 - risk)),
+    redFlags:scamEvidence.map(item => item.label),
+    explanations:scamEvidence,
+    positiveSignals,
+    signals:words.length,
+    model:"Ensemble (Naive Bayes, Logistic Regression, Linear SVM)",
+    trainingExamples:labeledDocs.length,
+    comparison,
+    evaluation:{method:"5-fold cross-validation", examples:labeledDocs.length, caveat:"Metrics come from a small illustrative demo corpus and do not predict real-world accuracy."}
+  };
+}
+
+async function authenticate(req) {
   const secretKey = process.env.CLERK_SECRET_KEY;
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.CLERK_PUBLISHABLE_KEY;
-  if (!secretKey || !publishableKey) return res.status(503).json({error:"Account sign-in is not configured yet."});
+  if (!secretKey || !publishableKey) throw Object.assign(new Error("Account sign-in is not configured yet."), {status:503});
   const bearer = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
-  if (!bearer) return res.status(401).json({error:"Sign in to analyze a listing."});
+  if (!bearer) throw Object.assign(new Error("Sign in to analyze a listing."), {status:401});
+  const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || (forwardedHost.startsWith("localhost") ? "http" : "https")).split(",")[0].trim();
+  if (!forwardedHost) throw Object.assign(new Error("Could not identify the application host."), {status:400});
+  const headers = new Headers({authorization:`Bearer ${bearer[1]}`});
+  if (req.headers.origin) headers.set("origin", String(req.headers.origin));
+  const webRequest = new Request(new URL(req.url || "/api/analyze", `${forwardedProto}://${forwardedHost}`), {method:"POST", headers});
+  const clerk = createClerkClient({secretKey, publishableKey});
+  const authState = await clerk.authenticateRequest(webRequest, {authorizedParties});
+  if (!authState.isAuthenticated) throw Object.assign(new Error("Your session expired. Sign in again to continue."), {status:401});
+}
+
+module.exports = async (req, res) => {
+  if (req.method !== "POST") return res.status(405).json({error:"Use POST"});
   try {
-    const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "");
-    const forwardedProto = String(req.headers["x-forwarded-proto"] || (forwardedHost.startsWith("localhost") ? "http" : "https")).split(",")[0].trim();
-    if (!forwardedHost) return res.status(400).json({error:"Could not identify the application host."});
-    const headers = new Headers({authorization:`Bearer ${bearer[1]}`});
-    if (req.headers.origin) headers.set("origin", String(req.headers.origin));
-    const webRequest = new Request(new URL(req.url || "/api/analyze", `${forwardedProto}://${forwardedHost}`), {method:"POST", headers});
-    const clerk = createClerkClient({secretKey, publishableKey});
-    const authState = await clerk.authenticateRequest(webRequest, {authorizedParties});
-    if (!authState.isAuthenticated) return res.status(401).json({error:"Your session expired. Sign in again to continue."});
-  } catch {
-    return res.status(401).json({error:"Your session expired. Sign in again to continue."});
+    await authenticate(req);
+  } catch (error) {
+    return res.status(error.status || 401).json({error:error.message || "Your session expired. Sign in again to continue."});
   }
-  const text=String((req.body||{}).text||"").slice(0,12000).trim();
+  const text = String((req.body || {}).text || "").slice(0, 12000).trim();
   if (text.length < 35) return res.status(400).json({error:"Paste at least a few sentences from the job listing (35 characters minimum)."});
   return res.status(200).json(classify(text));
 };
