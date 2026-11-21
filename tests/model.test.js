@@ -53,6 +53,10 @@ test("model card identifies EMSCAD and reports fake-class metrics and matrices",
   assert.match(card.evaluation.method, /stratified 80\/20/i);
   assert.equal(card.models.length, 4);
   assert.ok(card.models.some(model => model.name === card.selectedModel));
+  assert.equal(card.crossValidation.folds.length, 5);
+  assert.equal(card.crossValidation.threshold, 0.5);
+  assert.equal(card.thresholdTuning.deployed, false);
+  assert.equal(card.modernQualitativeChecks.length, 3);
   for (const model of card.models) {
     for (const metric of ["accuracy", "precision", "recall", "f1", "prAuc"]) {
       assert.ok(Number.isFinite(model[metric]), `${model.name} ${metric} is finite`);
@@ -61,6 +65,15 @@ test("model card identifies EMSCAD and reports fake-class metrics and matrices",
     const {tp, fp, fn, tn} = model.confusionMatrix;
     assert.equal(tp + fp + fn + tn, card.evaluation.examples);
   }
+});
+
+test("modern-style WhatsApp and fee probes show both catches and a known miss", () => {
+  const examples = JSON.parse(fs.readFileSync(path.join(__dirname, "modern-scam-examples.json"), "utf8"));
+  assert.equal(examples.length, 3);
+  const results = examples.map(example => classify(example.text));
+  assert.equal(results[0].predictedLabel, "Fake-risk signals detected");
+  assert.equal(results[1].predictedLabel, "Fake-risk signals detected");
+  assert.equal(results[2].predictedLabel, "Below the model's fake-post threshold");
 });
 
 test("JavaScript TF-IDF and estimator output matches Python on parity samples", () => {

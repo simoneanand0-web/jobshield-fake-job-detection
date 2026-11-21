@@ -1,0 +1,17 @@
+[
+  {
+    "scenario": "WhatsApp-only contact, implausible weekly pay, registration fee, and personal email",
+    "text": "Work from home customer support agent. WhatsApp only for interview. Earn 5000 dollars weekly with no experience. Pay a refundable registration fee before onboarding. Email hiring.team2026@gmail.com to reserve your role.",
+    "explanation": "Hand-written modern-style probe; not a labeled real-world listing."
+  },
+  {
+    "scenario": "Remote data-entry role with WhatsApp-only contact and an upfront fee",
+    "text": "Remote data entry assistant. No degree required. Message us on WhatsApp only and pay a small registration fee to secure the position. Weekly salary 3000 dollars.",
+    "explanation": "Hand-written modern-style probe; not a labeled real-world listing."
+  },
+  {
+    "scenario": "India-style recruiter requests Aadhaar and bank details on Telegram before an interview",
+    "text": "We are hiring warehouse staff in Mumbai. Apply by sending your Aadhaar and bank details to our Telegram recruiter before the interview. Pay a refundable document verification fee.",
+    "explanation": "Hand-written regional-style probe; not a labeled real-world listing."
+  }
+]

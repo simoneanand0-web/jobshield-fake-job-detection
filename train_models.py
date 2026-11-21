@@ -31,7 +31,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 
@@ -109,8 +109,8 @@ def read_dataset(path: Path) -> tuple[pd.DataFrame, dict[str, int]]:
     }
 
 
-def metric_row(name: str, y_true: pd.Series, probabilities: np.ndarray) -> dict:
-    predicted = (probabilities >= 0.5).astype(int)
+def metric_row(name: str, y_true: pd.Series, probabilities: np.ndarray, threshold: float = 0.5) -> dict:
+    predicted = (probabilities >= threshold).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_true, predicted, labels=[0, 1]).ravel()
     return {
         "name": name,
@@ -121,6 +121,21 @@ def metric_row(name: str, y_true: pd.Series, probabilities: np.ndarray) -> dict:
         "prAuc": round(float(average_precision_score(y_true, probabilities)) * 100, 1),
         "confusionMatrix": {"tp": int(tp), "fp": int(fp), "fn": int(fn), "tn": int(tn)},
     }
+
+
+def tune_threshold_for_recall(labels: pd.Series, probabilities: np.ndarray, target_recall: float) -> tuple[float, dict]:
+    """Choose the highest validation cutoff that reaches the requested fake recall."""
+    candidates = np.unique(np.r_[probabilities, 0.0])
+    qualifying = []
+    for threshold in candidates:
+        row = metric_row("validation", labels, probabilities, float(threshold))
+        actual_recall = recall_score(labels, (probabilities >= threshold).astype(int), zero_division=0)
+        if actual_recall >= target_recall:
+            qualifying.append((float(threshold), row))
+    if not qualifying:
+        threshold = 0.0
+        return threshold, metric_row("validation", labels, probabilities, threshold)
+    return max(qualifying, key=lambda item: item[0])
 
 
 def as_float_list(array: np.ndarray) -> list[float]:
@@ -147,6 +162,11 @@ def fit_estimators(x_matrix, labels: pd.Series) -> dict:
     naive_bayes = MultinomialNB().fit(x_matrix, labels)
     logistic = LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)
     logistic.fit(x_matrix, labels)
+    calibrated_svm = fit_calibrated_svm(x_matrix, labels)
+    return {"naiveBayes": naive_bayes, "logistic": logistic, "calibratedSvm": calibrated_svm}
+
+
+def fit_calibrated_svm(x_matrix, labels: pd.Series):
     svm_estimator = LinearSVC(class_weight="balanced", random_state=42)
     try:
         calibrated_svm = CalibratedClassifierCV(
@@ -156,8 +176,44 @@ def fit_estimators(x_matrix, labels: pd.Series) -> dict:
         calibrated_svm = CalibratedClassifierCV(
             base_estimator=svm_estimator, method="sigmoid", cv=3, ensemble=False
         )
-    calibrated_svm.fit(x_matrix, labels)
-    return {"naiveBayes": naive_bayes, "logistic": logistic, "calibratedSvm": calibrated_svm}
+    return calibrated_svm.fit(x_matrix, labels)
+
+
+def five_fold_svm_metrics(x_text: pd.Series, labels: pd.Series) -> dict:
+    """Evaluate the selected model within the training partition, at the 0.5 cutoff."""
+    fold_rows = []
+    splitter = StratifiedKFold(n_splits=5, shuffle=True, random_state=44)
+    print("Running 5-fold CV on the training partition...", flush=True)
+    for fold, (fit_indices, eval_indices) in enumerate(splitter.split(x_text, labels), start=1):
+        x_fit = x_text.iloc[fit_indices]
+        x_eval = x_text.iloc[eval_indices]
+        y_fit = labels.iloc[fit_indices]
+        y_eval = labels.iloc[eval_indices]
+        vectorizer = make_vectorizer()
+        fit_matrix = vectorizer.fit_transform(x_fit)
+        eval_matrix = vectorizer.transform(x_eval)
+        model = fit_calibrated_svm(fit_matrix, y_fit)
+        probabilities = model.predict_proba(eval_matrix)[:, 1]
+        row = metric_row("Calibrated Linear SVM", y_eval, probabilities)
+        row.update({"fold": fold, "examples": int(len(y_eval)), "fakeExamples": int(y_eval.sum())})
+        fold_rows.append(row)
+        print(f"Completed CV fold {fold}/5: recall={row['recall']}%, F1={row['f1']}%", flush=True)
+
+    metric_names = ("accuracy", "precision", "recall", "f1", "prAuc")
+    summary = {
+        metric: {
+            "mean": round(float(np.mean([row[metric] for row in fold_rows])), 2),
+            "standardDeviation": round(float(np.std([row[metric] for row in fold_rows], ddof=1)), 2),
+        }
+        for metric in metric_names
+    }
+    return {
+        "method": "5-fold stratified CV within the 80% training partition; shuffle=True; random_state=44",
+        "classifier": "Calibrated Linear SVM",
+        "threshold": 0.5,
+        "folds": fold_rows,
+        "summary": summary,
+    }
 
 
 def estimator_probabilities(estimators: dict, x_matrix) -> dict[str, np.ndarray]:
@@ -228,6 +284,7 @@ def main() -> None:
     args = parser.parse_args()
 
     data, cleaning = read_dataset(Path(args.data))
+    print(f"Loaded and cleaned {len(data):,} unique listings.", flush=True)
     x_train, x_test, y_train, y_test = train_test_split(
         data["text"],
         data["fraudulent"],
@@ -254,6 +311,11 @@ def main() -> None:
         validation_probabilities,
         key=lambda name: raw_selection_key(y_validation, validation_probabilities[name]),
     )
+    print(f"Validation selected {best_name}; evaluating held-out split.", flush=True)
+    target_validation_recall = 0.85
+    candidate_threshold, validation_threshold_metrics = tune_threshold_for_recall(
+        y_validation, validation_probabilities[best_name], target_validation_recall
+    )
 
     vectorizer = make_vectorizer()
     x_train_matrix = vectorizer.fit_transform(x_train)
@@ -262,6 +324,24 @@ def main() -> None:
     probabilities = estimator_probabilities(estimators, x_test_matrix)
     results = [metric_row(name, y_test, values) for name, values in probabilities.items()]
     results.sort(key=selection_key, reverse=True)
+    threshold_test_metrics = {
+        "default": metric_row(best_name, y_test, probabilities[best_name], 0.5),
+        "recallForwardCandidate": metric_row(best_name, y_test, probabilities[best_name], candidate_threshold),
+    }
+    cross_validation = five_fold_svm_metrics(x_train, y_train)
+
+    modern_examples_path = Path("tests/modern-scam-examples.json")
+    modern_examples = json.loads(modern_examples_path.read_text(encoding="utf-8"))
+    modern_matrix = vectorizer.transform([sample["text"] for sample in modern_examples])
+    modern_scores = estimator_probabilities(estimators, modern_matrix)[best_name]
+    modern_checks = []
+    for sample, score in zip(modern_examples, modern_scores):
+        modern_checks.append({
+            "scenario": sample["scenario"],
+            "modelScore": round(float(score) * 100, 1),
+            "predictedFake": bool(score >= 0.5),
+            "explanation": sample["explanation"],
+        })
 
     naive_bayes = estimators["naiveBayes"]
     logistic = estimators["logistic"]
@@ -281,6 +361,16 @@ def main() -> None:
             "finalTestUsedForSelection": False,
         },
         "decisionThreshold": 0.5,
+        "thresholdTuning": {
+            "method": "Highest cutoff on the training validation split that reaches the target fake-class recall",
+            "targetValidationRecall": round(target_validation_recall * 100, 1),
+            "candidateThreshold": round(float(candidate_threshold), 8),
+            "validationMetrics": validation_threshold_metrics,
+            "testMetrics": threshold_test_metrics,
+            "deployed": False,
+        },
+        "crossValidation": cross_validation,
+        "modernQualitativeChecks": modern_checks,
         "dataset": {
             "name": DATASET_NAME,
             "source": DATASET_SOURCE,
@@ -353,6 +443,9 @@ def main() -> None:
     print("\nFake-positive confusion matrices:")
     for row in results:
         print(f"{row['name']}: {json.dumps(row['confusionMatrix'], sort_keys=True)}")
+    print("\nRecall-forward threshold candidate:", json.dumps(weights["thresholdTuning"], sort_keys=True))
+    print("\nFive-fold cross-validation:", json.dumps(weights["crossValidation"]["summary"], sort_keys=True))
+    print("\nModern-style qualitative checks:", json.dumps(weights["modernQualitativeChecks"], sort_keys=True))
     print(f"\nSelected for the live JavaScript scorer on validation data by fake-class F1, then PR-AUC: {best_name}")
     print(f"Wrote {args.weights}, {output / 'comparison.json'}, {args.parity}, and {args.matrix}")
 

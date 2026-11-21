@@ -134,6 +134,9 @@ function getModelInfo() {
     updatedAt:MODEL_UPDATED_AT,
     selectedModel:weights.selectedModel,
     modelSelection:weights.modelSelection,
+    thresholdTuning:weights.thresholdTuning,
+    crossValidation:weights.crossValidation,
+    modernQualitativeChecks:weights.modernQualitativeChecks,
     dataset:weights.dataset,
     models:weights.models,
     evaluation:weights.evaluation,
@@ -141,7 +144,8 @@ function getModelInfo() {
     limitations:[
       "EMSCAD contains English-language job ads published in 2012–2014; newer scam styles, regions, and labor markets may differ.",
       "This is a text-only model trained on title, company profile, description, requirements, and benefits; it does not verify employers, domains, or live job pages.",
-      "The reported metrics use one stratified held-out split from the same historical dataset, not an independent or current benchmark.",
+      "The held-out test split and five-fold cross-validation use historical EMSCAD data; neither is an independent benchmark of current job listings.",
+      "Three hand-written modern-style probes are qualitative examples, not a representative or labeled modern-scam benchmark.",
       "The selected SVM uses sigmoid calibration, but the score has not been validated as a real-world probability on current listings. A high or low score is not proof that a listing is fake or legitimate.",
       "Phrase matches may lack context. Messaging apps, personal email, and high pay alone do not prove fraud."
     ]
