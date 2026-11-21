@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500" role="img" aria-labelledby="title desc">
+  <title id="title">Ensemble confusion matrix</title>
+  <desc id="desc">On 40 illustrative examples, 19 fake listings were correctly predicted fake, one fake listing was predicted legitimate, one legitimate listing was predicted fake, and 19 legitimate listings were correctly predicted legitimate.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#17152b"/><stop offset="1" stop-color="#252143"/></linearGradient>
+    <linearGradient id="good" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#786af0"/><stop offset="1" stop-color="#6558d6"/></linearGradient>
+  </defs>
+  <rect width="960" height="500" rx="24" fill="url(#bg)"/>
+  <text x="48" y="58" fill="#b7afff" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="2">MODEL EVALUATION · ENSEMBLE</text>
+  <text x="48" y="98" fill="#ffffff" font-family="Arial,sans-serif" font-size="29" font-weight="700">Confusion matrix</text>
+  <text x="48" y="127" fill="#b7b5d0" font-family="Arial,sans-serif" font-size="15">Five-fold cross-validation · 40 hand-written illustrative examples</text>
+  <text x="535" y="169" fill="#b7b5d0" font-family="Arial,sans-serif" font-size="14" text-anchor="middle">Predicted label</text>
+  <text x="447" y="204" fill="#dfddf0" font-family="Arial,sans-serif" font-size="14" font-weight="600" text-anchor="middle">Fake</text>
+  <text x="621" y="204" fill="#dfddf0" font-family="Arial,sans-serif" font-size="14" font-weight="600" text-anchor="middle">Legitimate</text>
+  <text x="256" y="285" fill="#b7b5d0" font-family="Arial,sans-serif" font-size="14" text-anchor="middle" transform="rotate(-90 256 285)">Actual label</text>
+  <text x="302" y="261" fill="#dfddf0" font-family="Arial,sans-serif" font-size="14" font-weight="600" text-anchor="end">Fake</text>
+  <text x="302" y="365" fill="#dfddf0" font-family="Arial,sans-serif" font-size="14" font-weight="600" text-anchor="end">Legitimate</text>
+  <rect x="329" y="221" width="225" height="84" rx="13" fill="url(#good)"/>
+  <rect x="568" y="221" width="225" height="84" rx="13" fill="#35324f" stroke="#55516d"/>
+  <rect x="329" y="317" width="225" height="84" rx="13" fill="#35324f" stroke="#55516d"/>
+  <rect x="568" y="317" width="225" height="84" rx="13" fill="url(#good)"/>
+  <text x="441" y="265" fill="#ffffff" font-family="Arial,sans-serif" font-size="30" font-weight="700" text-anchor="middle">19</text>
+  <text x="441" y="287" fill="#e8e5ff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">TP · fake correctly flagged</text>
+  <text x="680" y="265" fill="#ffffff" font-family="Arial,sans-serif" font-size="30" font-weight="700" text-anchor="middle">1</text>
+  <text x="680" y="287" fill="#c8c5dc" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">FN · fake missed</text>
+  <text x="441" y="361" fill="#ffffff" font-family="Arial,sans-serif" font-size="30" font-weight="700" text-anchor="middle">1</text>
+  <text x="441" y="383" fill="#c8c5dc" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">FP · legitimate flagged</text>
+  <text x="680" y="361" fill="#ffffff" font-family="Arial,sans-serif" font-size="30" font-weight="700" text-anchor="middle">19</text>
+  <text x="680" y="383" fill="#e8e5ff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">TN · legitimate correctly lower-risk</text>
+  <rect x="48" y="430" width="864" height="1" fill="#49465f"/>
+  <text x="48" y="462" fill="#aaa7c2" font-family="Arial,sans-serif" font-size="13">Synthetic demo evaluation only. These counts are not evidence of real-world performance.</text>
+</svg>

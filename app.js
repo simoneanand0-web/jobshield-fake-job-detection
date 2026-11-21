@@ -10,6 +10,7 @@ let currentUserId = null;
 let userButtonMounted = false;
 let signInMounted = false;
 let currentAnalysisId = '';
+let currentModelVersion = '2.1.0';
 
 function mountSignIn() {
   if (signInMounted) return;
@@ -155,8 +156,9 @@ function saveHistory(result, listingText, listingUrl) {
     title:safeTitle(listingText),
     url:safeHistoryUrl(listingUrl),
     risk:result.risk,
+    riskLevel:result.riskLevel,
     verdict:result.verdict,
-    confidence:result.confidence,
+    modelAgreement:result.modelAgreement,
     redFlags:result.redFlags || [],
     explanations:result.explanations || [],
     positiveSignals:result.positiveSignals || [],
@@ -272,7 +274,9 @@ function downloadReport(result) {
     `Listing: ${safeTitle(text.value)}`,
     `Source: ${safeHistoryUrl(document.querySelector('#jobUrl').value) || 'Not provided'}`,
     '',
+    `Risk level: ${result.riskLevel || 'Not available'}`,
     `Risk score: ${result.risk}/100`,
+    `Model agreement (not calibrated confidence): ${result.modelAgreement ?? 'Not available'}%`,
     `Assessment: ${result.verdict}`,
     `Classifier: ${result.model}`,
     '',
@@ -327,16 +331,20 @@ function render(result, options = {}) {
   const flags = result.redFlags?.length
     ? result.redFlags.map(flag => `<div class="flag"><span>&#9650;</span>${escapeHtml(flag)}</div>`).join('')
     : '<div class="flag clear"><span>&#10003;</span>No strong scam patterns found in the text</div>';
+  const riskLevel = result.riskLevel || (result.risk >= 65 ? 'High' : result.risk >= 40 ? 'Medium' : 'Low');
+  const agreementLine = Number.isFinite(result.modelAgreement)
+    ? `Model agreement · ${result.modelAgreement}% (uncalibrated)`
+    : 'Model agreement unavailable for this saved result';
   const explanations = result.explanations?.length
-    ? result.explanations.map(item => `<li><b>${escapeHtml(item.label)}</b><span>Matched text: “${escapeHtml(item.evidence)}”</span><small>${escapeHtml(item.advice || '')}</small></li>`).join('')
+    ? result.explanations.map(item => `<li><b>${escapeHtml(item.label)}</b><span class="evidence-caption">Matched phrase</span><mark class="evidence-highlight">“${escapeHtml(item.evidence)}”</mark><small>${escapeHtml(item.advice || '')}</small></li>`).join('')
     : '<li><b>No strong known scam phrase matched</b><span>The model score is based on language patterns in the full listing.</span><small>Check the employer and application link independently.</small></li>';
   const positiveSignals = result.positiveSignals?.length
     ? `<div class="positive-signals"><b>Details that may support legitimacy</b><ul>${result.positiveSignals.map(item => `<li>${escapeHtml(item.label)}</li>`).join('')}</ul></div>` : '';
   const card = document.querySelector('#resultCard');
   card.dataset.risk = result.risk;
   card.classList.add('done');
-  card.innerHTML = `<div class="result-top"><span>ANALYSIS RESULT</span><span class="result-icon">&#9673;</span></div><div class="score-head"><div class="score-ring" style="--risk:${result.risk};--score-color:${color}"><span>${result.risk}</span></div><div><div class="score-title">${escapeHtml(result.verdict)}</div><div class="score-sub">Risk score · demo estimate, not a probability</div></div></div><div class="eyebrow section-label">SIGNALS FOUND</div><div class="flag-list">${flags}</div><details class="explanation"><summary>Why this score?</summary><ul>${explanations}</ul>${positiveSignals}<p class="caveat">This score is a screening signal, not a determination. Confirm details directly with the employer.</p></details>${renderComparison(result)}<div class="result-actions"><button id="copyResult">Copy summary</button><button id="downloadReport">Download report</button><button id="againResult">Check another</button></div><div class="feedback-panel"><b>Was this result helpful?</b><div class="feedback-votes"><button type="button" data-feedback="helpful">Yes</button><button type="button" data-feedback="not-helpful">No</button><select id="feedbackReason" aria-label="Optional feedback reason"><option value="">Optional reason</option><option value="false-alarm">It flagged a legitimate listing</option><option value="missed-signal">It missed a warning sign</option><option value="unclear-score">The score was unclear</option></select><button type="button" id="saveFeedback" disabled>Save</button></div><small id="feedbackMessage">Feedback stays in this browser and is not sent to a server.</small></div><div class="result-foot" style="margin-top:13px"><span>MODEL · ${result.trainingExamples} EXAMPLES</span><b>${result.signals} text signals</b></div>`;
-  document.querySelector('#copyResult').onclick = () => navigator.clipboard?.writeText(`${result.verdict} - scam risk ${result.risk}/100. ${result.redFlags?.join('; ') || 'No strong known pattern matched.'}`).then(() => notify('Summary copied.')).catch(() => notify('Copy unavailable in this browser.'));
+  card.innerHTML = `<div class="result-top"><span>ANALYSIS RESULT</span><span class="result-icon">&#9673;</span></div><div class="score-head"><div class="score-ring" style="--risk:${result.risk};--score-color:${color}"><span>${result.risk}</span></div><div class="score-copy"><span class="risk-chip risk-${riskLevel.toLowerCase()}">${escapeHtml(riskLevel)} risk</span><div class="score-title">${escapeHtml(result.verdict)}</div><div class="score-sub">Risk score · demo estimate, not a probability</div><div class="agreement-score" title="Average agreement between the Naive Bayes, Logistic Regression, and Linear SVM scores; not calibrated confidence.">${escapeHtml(agreementLine)}</div></div></div><div class="eyebrow section-label">SIGNALS FOUND</div><div class="flag-list">${flags}</div><details class="explanation" open><summary>Why this score?</summary><ul>${explanations}</ul>${positiveSignals}<p class="caveat">Exact matched phrases are highlighted. This is a screening signal, not proof; verify the employer directly.</p></details>${renderComparison(result)}<div class="result-actions"><button id="copyResult">Copy summary</button><button id="downloadReport">Download report</button><button id="againResult">Check another</button></div><div class="feedback-panel"><b>Was this result helpful?</b><div class="feedback-votes"><button type="button" data-feedback="helpful">Yes</button><button type="button" data-feedback="not-helpful">No</button><select id="feedbackReason" aria-label="Optional feedback reason"><option value="">Optional reason</option><option value="false-alarm">It flagged a legitimate listing</option><option value="missed-signal">It missed a warning sign</option><option value="unclear-score">The score was unclear</option></select><button type="button" id="saveFeedback" disabled>Save</button></div><small id="feedbackMessage">Feedback stays in this browser and is not sent to a server.</small></div><div class="result-foot" style="margin-top:13px"><span>MODEL v${escapeHtml(currentModelVersion)} · ${result.trainingExamples} EXAMPLES</span><b>${result.signals} text signals</b></div>`;
+  document.querySelector('#copyResult').onclick = () => navigator.clipboard?.writeText(`${riskLevel} risk (${result.risk}/100; model agreement ${result.modelAgreement ?? 'n/a'}%). ${result.redFlags?.join('; ') || 'No strong known pattern matched.'}`).then(() => notify('Summary copied.')).catch(() => notify('Copy unavailable in this browser.'));
   document.querySelector('#downloadReport').onclick = () => downloadReport(result);
   document.querySelector('#againResult').onclick = () => {
     text.value = '';
@@ -373,7 +381,12 @@ function showHistory() {
 document.querySelector('#historyNav').onclick = showHistory;
 document.querySelector('#closeHistory').onclick = () => historyDialog.classList.add('hidden');
 historyDialog.addEventListener('click', event => { if (event.target === historyDialog) historyDialog.classList.add('hidden'); });
-document.addEventListener('keydown', event => { if (event.key === 'Escape') historyDialog.classList.add('hidden'); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    historyDialog.classList.add('hidden');
+    document.querySelector('#modelInfoDialog').classList.add('hidden');
+  }
+});
 document.querySelector('#clearHistory').onclick = () => {
   if (!currentUserId || !confirm('Clear saved check summaries from this browser?')) return;
   localStorage.removeItem(userStorageKey('history'));
@@ -384,9 +397,38 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 }
 
-document.querySelector('#aboutModel').onclick = event => {
+function renderModelInfo(info) {
+  currentModelVersion = String(info.version || '2.1.0');
+  document.querySelector('#modelVersion').textContent = `v${currentModelVersion}`;
+  const updated = new Date(`${info.updatedAt || '2026-11-21'}T12:00:00`).toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric'});
+  document.querySelector('#modelUpdated').textContent = `UPDATED ${updated.toUpperCase()}`;
+  const models = Array.isArray(info.models) ? info.models : [];
+  const percent = value => `${Number(value || 0)}%`;
+  const modelRows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${percent(model.accuracy)}</td><td>${percent(model.precision)}</td><td>${percent(model.recall)}</td><td>${percent(model.f1)}</td></tr>`).join('');
+  const matrixRows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${Number(model.confusionMatrix?.tp || 0)}</td><td>${Number(model.confusionMatrix?.fp || 0)}</td><td>${Number(model.confusionMatrix?.fn || 0)}</td><td>${Number(model.confusionMatrix?.tn || 0)}</td></tr>`).join('');
+  const limitations = (info.limitations || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');
+  const dataset = info.dataset || {};
+  document.querySelector('#modelInfoBody').innerHTML = `<div class="model-intro"><p><b>${escapeHtml(dataset.name || 'JobShield demo corpus')}</b> contains ${Number(dataset.total || 0)} labeled examples: ${Number(dataset.legitimateStyle || 0)} legitimate-style and ${Number(dataset.fakeStyle || 0)} fake-style.</p><p>${escapeHtml(dataset.source || '')}</p></div><div class="model-stat-grid"><div><span>MODEL VERSION</span><b>v${escapeHtml(currentModelVersion)}</b></div><div><span>LAST UPDATED</span><b>${escapeHtml(updated)}</b></div><div><span>EVALUATION</span><b>${escapeHtml(info.evaluation?.method || 'Not available')}</b></div><div><span>ENSEMBLE</span><b>${(info.ensemble || []).map(escapeHtml).join(' + ')}</b></div></div><h3>Cross-validation results</h3><p class="model-method">Positive class: <b>${escapeHtml(info.evaluation?.positiveClass || 'Fake job post')}</b>. ${escapeHtml(info.evaluation?.note || '')}</p><div class="table-scroll"><table class="metrics-table model-card-table"><thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead><tbody>${modelRows}</tbody></table></div><h3>Confusion matrix counts</h3><p class="model-method">Across all ${Number(info.evaluation?.examples || 0)} cross-validated predictions. TP/FP/FN/TN are for the fake-job positive class.</p><div class="table-scroll"><table class="metrics-table matrix-table model-card-table"><thead><tr><th>Model</th><th>TP</th><th>FP</th><th>FN</th><th>TN</th></tr></thead><tbody>${matrixRows}</tbody></table></div><details class="model-limitations" open><summary>Limitations</summary><ul>${limitations}</ul></details><p class="model-disclaimer">These metrics describe this small demo corpus only. They should not be presented as validated real-world performance.</p>`;
+}
+
+document.querySelector('#aboutModel').onclick = async event => {
   event.preventDefault();
-  notify('Demo uses 40 illustrative examples and 5-fold cross-validation. Model scores are not real-world guarantees.');
+  const dialog = document.querySelector('#modelInfoDialog');
+  const body = document.querySelector('#modelInfoBody');
+  dialog.classList.remove('hidden');
+  body.innerHTML = '<div class="model-loading">Loading the current dataset and evaluation results…</div>';
+  try {
+    const response = await fetch('/api/analyze', {method:'GET', cache:'no-store'});
+    const info = await response.json();
+    if (!response.ok) throw new Error(info.error || 'Model information is unavailable.');
+    renderModelInfo(info);
+  } catch (error) {
+    body.innerHTML = `<div class="model-load-error">${escapeHtml(error.message || 'Model information could not be loaded. Please try again.')}</div>`;
+  }
 };
+document.querySelector('#closeModelInfo').onclick = () => document.querySelector('#modelInfoDialog').classList.add('hidden');
+document.querySelector('#modelInfoDialog').addEventListener('click', event => {
+  if (event.target.id === 'modelInfoDialog') event.currentTarget.classList.add('hidden');
+});
 
 initializeAuth();
