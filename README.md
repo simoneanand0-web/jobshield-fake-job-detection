@@ -208,6 +208,7 @@ Training writes the deployable JavaScript weights and evaluation metadata to `ap
 
 ## Model version, author, and code license
 
+
 - **Live model version:** 3.0.0
 - **Model update date:** 2026-11-21
 - **Author:** [simoneanand0-web](https://github.com/simoneanand0-web)
