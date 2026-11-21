@@ -4,6 +4,8 @@
 node_modules/
 .vercel/
 model_artifacts/
+.venv/
+data/
 __pycache__/
 *.py[cod]
 .DS_Store

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" role="img" aria-labelledby="title desc">
+  <title id="title">Confusion matrix for Calibrated Linear SVM</title>
+  <desc id="desc">Held-out test confusion matrix with 3174 rows. Rows are actual class and columns are predicted class.</desc>
+  <style>text{font-family:Arial,sans-serif;fill:#182b27} .title{font-size:25px;font-weight:700} .sub{font-size:14px;fill:#667a73} .axis{font-size:15px;font-weight:700} .label{font-size:13px;fill:#667a73} .count{font-size:31px;font-weight:700} .cell-label{font-size:13px;fill:#667a73}</style>
+  <rect width="900" height="560" rx="24" fill="#fff" />
+  <text x="48" y="58" class="title">Held-out confusion matrix</text>
+  <text x="48" y="84" class="sub">Calibrated Linear SVM · fake job post is the positive class · 3,174 test listings</text>
+  <text x="485" y="125" text-anchor="middle" class="axis">Predicted class</text>
+  <text x="375" y="155" text-anchor="middle" class="label">Legitimate</text>
+  <text x="595" y="155" text-anchor="middle" class="label">Fake</text>
+  <text x="96" y="275" text-anchor="middle" class="axis" transform="rotate(-90 96 275)">Actual class</text>
+  <text x="210" y="240" text-anchor="middle" class="label">Legitimate</text>
+  <text x="210" y="390" text-anchor="middle" class="label">Fake</text>
+  <rect x="290" y="180" width="170" height="112" rx="14" fill="#e4f2ed" /><text x="375" y="228" text-anchor="middle" class="count">3013</text><text x="375" y="258" text-anchor="middle" class="cell-label">True negative</text><rect x="510" y="180" width="170" height="112" rx="14" fill="#fff1dc" /><text x="595" y="228" text-anchor="middle" class="count">19</text><text x="595" y="258" text-anchor="middle" class="cell-label">False positive</text><rect x="290" y="330" width="170" height="112" rx="14" fill="#fff1dc" /><text x="375" y="378" text-anchor="middle" class="count">36</text><text x="375" y="408" text-anchor="middle" class="cell-label">False negative</text><rect x="510" y="330" width="170" height="112" rx="14" fill="#e2eee7" /><text x="595" y="378" text-anchor="middle" class="count">106</text><text x="595" y="408" text-anchor="middle" class="cell-label">True positive</text>
+  <text x="48" y="520" class="sub">Precision, recall, F1, and PR-AUC are reported for fake listings. Test split kept separate from training.</text>
+</svg>

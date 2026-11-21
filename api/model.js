@@ -1,170 +1,10 @@
-const MODEL_VERSION = "2.1.0";
-const MODEL_UPDATED_AT = "2026-11-21";
+"use strict";
+
+const weights = require("./model_weights.json");
+const MODEL_VERSION = weights.version;
+const MODEL_UPDATED_AT = weights.updatedAt;
 const MAX_LISTING_CHARS = 12000;
-const samples = [
-  [1,"Senior software engineer build scalable applications collaborate product team competitive salary health insurance apply through company careers page"],
-  [1,"Registered nurse full time hospital experience required benefits paid leave submit resume to hr department"],
-  [1,"Marketing coordinator plan campaigns analyze performance bachelor's degree preferred hybrid position apply online"],
-  [1,"Data analyst use SQL Python dashboards and business intelligence tools salary range listed equal opportunity employer"],
-  [1,"Customer service representative answer customer questions training provided hourly pay company benefits background check"],
-  [1,"Project manager coordinate timelines budgets and stakeholders PMP certification preferred full time position"],
-  [1,"Accountant prepare financial statements reconcile accounts CPA preferred competitive compensation and retirement plan"],
-  [1,"Warehouse associate pick pack and ship orders safety training provided hourly wage overtime available"],
-  [1,"UX designer conduct user research create wireframes partner with engineers portfolio required remote eligible"],
-  [1,"Operations assistant organize schedules maintain records and support daily office operations paid vacation"],
-  [1,"Sales representative manage business accounts meet quarterly targets base salary plus commission and health coverage"],
-  [1,"Electrical technician maintain equipment follow safety procedures two years experience required paid holidays"],
-  [1,"Human resources specialist support recruitment onboarding employee relations and payroll systems"],
-  [1,"Content writer research and write articles follow editorial guidelines samples required salaried role"],
-  [1,"Teaching assistant support classroom instruction bachelor's degree background check required school district benefits"],
-  [1,"Junior developer review code write tests work with senior engineers internship experience helpful"],
-  [1,"Delivery driver valid license clean driving record company vehicle provided hourly pay"],
-  [1,"Medical receptionist schedule appointments verify insurance maintain patient records clinic experience preferred"],
-  [1,"Business analyst gather requirements document workflows communicate with stakeholders full time position"],
-  [1,"Graphic designer create brand assets collaborate with creative team submit portfolio with application"],
-  [0,"Work from home earn 5000 weekly no experience needed pay registration fee today limited vacancies"],
-  [0,"We will send you a check to buy equipment deposit the extra money into our vendor account immediately"],
-  [0,"Guaranteed job offer without interview send your social security number and bank details to recruiter"],
-  [0,"Make money fast processing payments from home keep a generous commission no background check"],
-  [0,"Urgent hiring personal assistant receive packages and reship them earn huge income with no experience"],
-  [0,"Pay a small training fee to secure your position guaranteed income work only two hours daily"],
-  [0,"Congratulations you are selected immediately click this link and provide your passport and banking information"],
-  [0,"Earn 300 dollars per hour stuffing envelopes no skills required pay for starter kit"],
-  [0,"Crypto investment company hiring money transfer agents send funds through your personal account"],
-  [0,"No interview needed instant hiring work from anywhere send copies of identity documents by chat"],
-  [0,"Deposit this cashier check purchase gift cards and send codes to your hiring manager"],
-  [0,"Secret shopper job requires upfront payment for your background check guaranteed placement"],
-  [0,"Recruiter asks for your bank login to set up direct deposit before an interview"],
-  [0,"Work remotely receive and forward parcels using your home address earn easy cash"],
-  [0,"Pay a refundable application deposit by cryptocurrency to reserve this high paying job"],
-  [0,"Limited time offer no qualifications needed send a fee to unlock the job description"],
-  [0,"We hire instantly via messaging app provide your tax number and pay processing charge"],
-  [0,"Earn passive income by accepting money transfers through your personal bank account"],
-  [0,"Amazing salary for easy work no interview required purchase our mandatory starter package"],
-  [0,"Urgent opportunity send your identity documents and account number before we reveal employer"]
-];
-
-const tokenize = value => (String(value).toLowerCase().match(/[a-z0-9]+/g) || []).filter(word => word.length > 1);
-const stop = new Set("the and for with from your this that are our you will have into through their about work job role team".split(" "));
-const vectorize = value => tokenize(value).filter(word => !stop.has(word));
-const labeledDocs = samples.map(([label, text]) => ({label, words:vectorize(text)}));
-
-function sigmoid(value) {
-  if (value > 30) return 1;
-  if (value < -30) return 0;
-  return 1 / (1 + Math.exp(-value));
-}
-
-function trainNaiveBayes(training) {
-  const wordCounts = [new Map(), new Map()];
-  const totals = [0, 0];
-  const classCounts = [0, 0];
-  const vocab = new Set();
-  for (const doc of training) {
-    const fake = doc.label === 0 ? 1 : 0;
-    classCounts[fake]++;
-    for (const word of doc.words) {
-      vocab.add(word);
-      wordCounts[fake].set(word, (wordCounts[fake].get(word) || 0) + 1);
-      totals[fake]++;
-    }
-  }
-  const size = Math.max(vocab.size, 1);
-  return words => {
-    let fake = Math.log((classCounts[1] + 1) / (training.length + 2));
-    let genuine = Math.log((classCounts[0] + 1) / (training.length + 2));
-    for (const word of words) {
-      fake += Math.log(((wordCounts[1].get(word) || 0) + 1) / (totals[1] + size));
-      genuine += Math.log(((wordCounts[0].get(word) || 0) + 1) / (totals[0] + size));
-    }
-    return sigmoid(fake - genuine);
-  };
-}
-
-function trainLinear(training, kind) {
-  const vocab = [...new Set(training.flatMap(doc => doc.words))];
-  const index = new Map(vocab.map((word, i) => [word, i]));
-  const weights = new Float64Array(vocab.length);
-  let bias = 0;
-  const passes = kind === "svm" ? 36 : 100;
-  const rate = kind === "svm" ? 0.025 : 0.12;
-  for (let pass = 0; pass < passes; pass++) {
-    for (const doc of training) {
-      const indices = [...new Set(doc.words.map(word => index.get(word)).filter(value => value !== undefined))];
-      const target = doc.label === 0 ? 1 : 0;
-      let score = bias;
-      for (const i of indices) score += weights[i];
-      if (kind === "svm") {
-        const y = target ? 1 : -1;
-        if (y * score < 1) {
-          for (let i = 0; i < weights.length; i++) weights[i] *= 1 - rate * 0.001;
-          for (const i of indices) weights[i] += rate * y;
-          bias += rate * y;
-        }
-      } else {
-        const error = target - sigmoid(score);
-        for (let i = 0; i < weights.length; i++) weights[i] *= 1 - rate * 0.0008;
-        for (const i of indices) weights[i] += rate * error;
-        bias += rate * error;
-      }
-    }
-  }
-  return words => {
-    let score = bias;
-    for (const word of words) {
-      const i = index.get(word);
-      if (i !== undefined) score += weights[i];
-    }
-    return kind === "svm" ? sigmoid(score * 1.25) : sigmoid(score);
-  };
-}
-
-function trainEnsemble(training) {
-  const models = [trainNaiveBayes(training), trainLinear(training, "logistic"), trainLinear(training, "svm")];
-  return words => models.reduce((sum, model) => sum + model(words), 0) / models.length;
-}
-
-const modelTypes = [
-  {key:"naiveBayes", name:"Naive Bayes"},
-  {key:"logistic", name:"Logistic Regression"},
-  {key:"svm", name:"Linear SVM"},
-  {key:"ensemble", name:"Ensemble"}
-];
-const trainers = {
-  naiveBayes:trainNaiveBayes,
-  logistic:training => trainLinear(training, "logistic"),
-  svm:training => trainLinear(training, "svm"),
-  ensemble:trainEnsemble
-};
-
-function evaluateModel(key) {
-  const matrix = {tp:0, fp:0, fn:0, tn:0};
-  const folds = 5;
-  for (let fold = 0; fold < folds; fold++) {
-    const training = labeledDocs.filter((_, i) => i % folds !== fold);
-    const validation = labeledDocs.filter((_, i) => i % folds === fold);
-    const predict = trainers[key](training);
-    for (const doc of validation) {
-      const predictedFake = predict(doc.words) >= 0.5;
-      const actualFake = doc.label === 0;
-      if (actualFake && predictedFake) matrix.tp++;
-      else if (!actualFake && predictedFake) matrix.fp++;
-      else if (actualFake && !predictedFake) matrix.fn++;
-      else matrix.tn++;
-    }
-  }
-  const precision = matrix.tp / Math.max(matrix.tp + matrix.fp, 1);
-  const recall = matrix.tp / Math.max(matrix.tp + matrix.fn, 1);
-  return {
-    accuracy:Math.round((matrix.tp + matrix.tn) / labeledDocs.length * 100),
-    precision:Math.round(precision * 100),
-    recall:Math.round(recall * 100),
-    f1:Math.round(2 * precision * recall / Math.max(precision + recall, 0.0001) * 100),
-    confusionMatrix:matrix
-  };
-}
-const comparison = modelTypes.map(model => ({...model, ...evaluateModel(model.key)}));
-const fullModels = [trainNaiveBayes(labeledDocs), trainLinear(labeledDocs, "logistic"), trainLinear(labeledDocs, "svm")];
+const stopWords = new Set(weights.tfidf.stopWords);
 
 const scamRules = [
   {pattern:/(?:upfront|registration|training|application|starter|processing)\s+fee|pay.{0,24}fee|deposit.{0,24}(?:fee|money)/i, label:"Requests an upfront payment", advice:"Do not pay to apply. Check the employer's official careers page and contact details."},
@@ -175,11 +15,64 @@ const scamRules = [
   {pattern:/cashier check|gift cards|crypto|cryptocurrency|reship|forward parcels|money transfer/i, label:"Mentions a payment or reshipping scam pattern", advice:"Never deposit a check, buy gift cards, move money, or forward parcels for a recruiter."},
   {pattern:/without interview|no interview|hire instantly|instant hiring|guaranteed job/i, label:"Claims hiring without a normal interview process", advice:"Verify the hiring process using contact details from the company's official website."}
 ];
+
 const positiveRules = [
   {pattern:/health insurance|medical benefits|retirement plan|401\s?k|paid leave|paid vacation/i, label:"Lists standard employment benefits"},
   {pattern:/salary range|\$\s?\d[\d,]*\s?(?:-|to)\s?\$?\s?\d|equal opportunity employer/i, label:"Includes specific compensation or equal-opportunity details"},
   {pattern:/apply through (?:the )?(?:company|official) careers page|company careers page|official careers page/i, label:"Directs applicants to an official careers page"}
 ];
+
+function sigmoid(value) {
+  if (value >= 0) return 1 / (1 + Math.exp(-value));
+  const exp = Math.exp(value);
+  return exp / (1 + exp);
+}
+
+function sparseTfidf(text) {
+  const tokens = (String(text).toLowerCase().match(/[\p{L}\p{N}_]{2,}/gu) || [])
+    .filter(token => !stopWords.has(token));
+  const terms = new Map();
+  for (let i = 0; i < tokens.length; i++) {
+    terms.set(tokens[i], (terms.get(tokens[i]) || 0) + 1);
+    if (i + 1 < tokens.length) {
+      const bigram = `${tokens[i]} ${tokens[i + 1]}`;
+      terms.set(bigram, (terms.get(bigram) || 0) + 1);
+    }
+  }
+
+  const entries = [];
+  let normSquared = 0;
+  for (const [term, frequency] of terms) {
+    const index = weights.tfidf.vocab[term];
+    if (index === undefined) continue;
+    const value = frequency * weights.tfidf.idf[index];
+    entries.push([index, value]);
+    normSquared += value * value;
+  }
+  const norm = Math.sqrt(normSquared) || 1;
+  return {entries:entries.map(([index, value]) => [index, value / norm]), tokenCount:tokens.length};
+}
+
+function linearScore(vector, estimator) {
+  let score = estimator.intercept;
+  for (const [index, value] of vector.entries) score += value * estimator.coef[index];
+  return score;
+}
+
+function estimatorProbabilities(vector) {
+  const models = weights.estimators;
+  const naiveBayes = sigmoid(linearScore(vector, models.naiveBayes));
+  const logistic = sigmoid(linearScore(vector, models.logistic));
+  const svmMargin = linearScore(vector, models.linearSvm);
+  const {a, b} = models.linearSvm.calibration;
+  const calibratedSvm = sigmoid(-(a * svmMargin + b));
+  return {
+    "Multinomial Naive Bayes":naiveBayes,
+    "Logistic Regression":logistic,
+    "Calibrated Linear SVM":calibratedSvm,
+    "Soft Voting Ensemble":(naiveBayes + logistic + calibratedSvm) / 3
+  };
+}
 
 function evidenceFrom(text, rules) {
   return rules.flatMap(rule => {
@@ -189,29 +82,37 @@ function evidenceFrom(text, rules) {
 }
 
 function classify(text) {
-  const words = vectorize(text);
-  const probabilities = fullModels.map(model => model(words));
-  const risk = Math.round(probabilities.reduce((sum, probability) => sum + probability, 0) / probabilities.length * 100);
-  const modelAgreement = Math.round((1 - (Math.max(...probabilities) - Math.min(...probabilities))) * 100);
+  const vector = sparseTfidf(text);
+  const scores = estimatorProbabilities(vector);
+  const fakeScore = scores[weights.selectedModel];
+  const risk = Math.max(0, Math.min(100, Math.round(fakeScore * 100)));
+  const predictedFake = fakeScore >= weights.decisionThreshold;
+  const riskLevel = risk >= 65 ? "High" : risk >= 40 ? "Medium" : "Low";
   const scamEvidence = evidenceFrom(text, scamRules);
   const positiveSignals = evidenceFrom(text, positiveRules);
   return {
     risk,
-    riskLevel:risk >= 65 ? "High" : risk >= 40 ? "Medium" : "Low",
-    verdict:risk >= 65 ? "Likely suspicious" : risk >= 40 ? "Needs careful review" : "Lower risk signals",
-    modelAgreement,
-    confidenceLabel:"Model agreement (uncalibrated)",
+    riskLevel,
+    verdict:predictedFake ? "Likely suspicious" : riskLevel === "Medium" ? "Needs careful review" : "Fewer scam signals detected",
+    scoreLabel:"Sigmoid-calibrated model score, not a verified real-world probability",
+    predictedLabel:predictedFake ? "Fake-risk signals detected" : "Below the model's fake-post threshold",
+    threshold:weights.decisionThreshold,
     redFlags:scamEvidence.map(item => item.label),
     explanations:scamEvidence,
     positiveSignals,
-    signals:words.length,
-    model:"Ensemble (Naive Bayes, Logistic Regression, Linear SVM)",
-    trainingExamples:labeledDocs.length,
-    comparison,
-    evaluation:{method:"5-fold cross-validation", examples:labeledDocs.length, caveat:"Metrics come from a small illustrative demo corpus and do not predict real-world accuracy."}
+    signals:vector.tokenCount,
+    model:weights.selectedModel,
+    modelVersion:MODEL_VERSION,
+    trainingExamples:weights.dataset.rowsAfterCleaning,
+    comparison:weights.models,
+    evaluation:weights.evaluation
   };
 }
 
+function scoreForText(text) {
+  const vector = sparseTfidf(text);
+  return estimatorProbabilities(vector)[weights.selectedModel];
+}
 
 function validateListingText(value) {
   if (typeof value !== "string" || !value.trim()) {
@@ -231,28 +132,20 @@ function getModelInfo() {
   return {
     version:MODEL_VERSION,
     updatedAt:MODEL_UPDATED_AT,
-    dataset:{
-      name:"JobShield illustrative demo corpus",
-      total:labeledDocs.length,
-      legitimateStyle:labeledDocs.filter(doc => doc.label === 1).length,
-      fakeStyle:labeledDocs.filter(doc => doc.label === 0).length,
-      source:"Hand-written illustrative examples bundled in api/model.js; not EMSCAD or another external dataset."
-    },
-    ensemble:["Multinomial Naive Bayes", "Logistic Regression", "Linear SVM"],
-    evaluation:{
-      method:"Deterministic, class-balanced 5-fold cross-validation",
-      examples:labeledDocs.length,
-      positiveClass:"Fake job post",
-      note:"Each example is evaluated once. The corpus is small, synthetic, and balanced, so these scores demonstrate evaluation code only; they are not evidence of real-world performance."
-    },
-    models:comparison,
+    selectedModel:weights.selectedModel,
+    modelSelection:weights.modelSelection,
+    dataset:weights.dataset,
+    models:weights.models,
+    evaluation:weights.evaluation,
+    candidateModels:weights.models.map(model => model.name),
     limitations:[
-      "The 40 examples are illustrative and balanced, unlike many real fake-job datasets.",
-      "This project does not currently train on EMSCAD or another external dataset.",
-      "The vocabulary, scam tactics, job markets, and languages in new listings may differ from these examples.",
-      "Risk scores and model-agreement values are uncalibrated screening estimates. Verify the employer and listing independently."
+      "EMSCAD contains English-language job ads published in 2012–2014; newer scam styles, regions, and labor markets may differ.",
+      "This is a text-only model trained on title, company profile, description, requirements, and benefits; it does not verify employers, domains, or live job pages.",
+      "The reported metrics use one stratified held-out split from the same historical dataset, not an independent or current benchmark.",
+      "The selected SVM uses sigmoid calibration, but the score has not been validated as a real-world probability on current listings. A high or low score is not proof that a listing is fake or legitimate.",
+      "Phrase matches may lack context. Messaging apps, personal email, and high pay alone do not prove fraud."
     ]
   };
 }
 
-module.exports = {classify, validateListingText, getModelInfo, MODEL_VERSION, MODEL_UPDATED_AT, MAX_LISTING_CHARS};
+module.exports = {classify, scoreForText, validateListingText, getModelInfo, MODEL_VERSION, MODEL_UPDATED_AT, MAX_LISTING_CHARS};

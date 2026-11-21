@@ -27,7 +27,7 @@ async function authenticate(req) {
 
 module.exports = async (req, res) => {
   if (req.method === "GET") {
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(getModelInfo());
   }
   if (req.method !== "POST") return res.status(405).json({error:"Use GET for model information or POST to analyze a listing."});

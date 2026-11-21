@@ -1,0 +1,202 @@
+[
+  {
+    "id": 1,
+    "fraudulent": 0,
+    "text": "Senior software engineer build scalable applications collaborate product team competitive salary health insurance apply through company careers page"
+  },
+  {
+    "id": 2,
+    "fraudulent": 0,
+    "text": "Registered nurse full time hospital experience required benefits paid leave submit resume to hr department"
+  },
+  {
+    "id": 3,
+    "fraudulent": 0,
+    "text": "Marketing coordinator plan campaigns analyze performance bachelor's degree preferred hybrid position apply online"
+  },
+  {
+    "id": 4,
+    "fraudulent": 0,
+    "text": "Data analyst use SQL Python dashboards and business intelligence tools salary range listed equal opportunity employer"
+  },
+  {
+    "id": 5,
+    "fraudulent": 0,
+    "text": "Customer service representative answer customer questions training provided hourly pay company benefits background check"
+  },
+  {
+    "id": 6,
+    "fraudulent": 0,
+    "text": "Project manager coordinate timelines budgets and stakeholders PMP certification preferred full time position"
+  },
+  {
+    "id": 7,
+    "fraudulent": 0,
+    "text": "Accountant prepare financial statements reconcile accounts CPA preferred competitive compensation and retirement plan"
+  },
+  {
+    "id": 8,
+    "fraudulent": 0,
+    "text": "Warehouse associate pick pack and ship orders safety training provided hourly wage overtime available"
+  },
+  {
+    "id": 9,
+    "fraudulent": 0,
+    "text": "UX designer conduct user research create wireframes partner with engineers portfolio required remote eligible"
+  },
+  {
+    "id": 10,
+    "fraudulent": 0,
+    "text": "Operations assistant organize schedules maintain records and support daily office operations paid vacation"
+  },
+  {
+    "id": 11,
+    "fraudulent": 0,
+    "text": "Sales representative manage business accounts meet quarterly targets base salary plus commission and health coverage"
+  },
+  {
+    "id": 12,
+    "fraudulent": 0,
+    "text": "Electrical technician maintain equipment follow safety procedures two years experience required paid holidays"
+  },
+  {
+    "id": 13,
+    "fraudulent": 0,
+    "text": "Human resources specialist support recruitment onboarding employee relations and payroll systems"
+  },
+  {
+    "id": 14,
+    "fraudulent": 0,
+    "text": "Content writer research and write articles follow editorial guidelines samples required salaried role"
+  },
+  {
+    "id": 15,
+    "fraudulent": 0,
+    "text": "Teaching assistant support classroom instruction bachelor's degree background check required school district benefits"
+  },
+  {
+    "id": 16,
+    "fraudulent": 0,
+    "text": "Junior developer review code write tests work with senior engineers internship experience helpful"
+  },
+  {
+    "id": 17,
+    "fraudulent": 0,
+    "text": "Delivery driver valid license clean driving record company vehicle provided hourly pay"
+  },
+  {
+    "id": 18,
+    "fraudulent": 0,
+    "text": "Medical receptionist schedule appointments verify insurance maintain patient records clinic experience preferred"
+  },
+  {
+    "id": 19,
+    "fraudulent": 0,
+    "text": "Business analyst gather requirements document workflows communicate with stakeholders full time position"
+  },
+  {
+    "id": 20,
+    "fraudulent": 0,
+    "text": "Graphic designer create brand assets collaborate with creative team submit portfolio with application"
+  },
+  {
+    "id": 21,
+    "fraudulent": 1,
+    "text": "Work from home earn 5000 weekly no experience needed pay registration fee today limited vacancies"
+  },
+  {
+    "id": 22,
+    "fraudulent": 1,
+    "text": "We will send you a check to buy equipment deposit the extra money into our vendor account immediately"
+  },
+  {
+    "id": 23,
+    "fraudulent": 1,
+    "text": "Guaranteed job offer without interview send your social security number and bank details to recruiter"
+  },
+  {
+    "id": 24,
+    "fraudulent": 1,
+    "text": "Make money fast processing payments from home keep a generous commission no background check"
+  },
+  {
+    "id": 25,
+    "fraudulent": 1,
+    "text": "Urgent hiring personal assistant receive packages and reship them earn huge income with no experience"
+  },
+  {
+    "id": 26,
+    "fraudulent": 1,
+    "text": "Pay a small training fee to secure your position guaranteed income work only two hours daily"
+  },
+  {
+    "id": 27,
+    "fraudulent": 1,
+    "text": "Congratulations you are selected immediately click this link and provide your passport and banking information"
+  },
+  {
+    "id": 28,
+    "fraudulent": 1,
+    "text": "Earn 300 dollars per hour stuffing envelopes no skills required pay for starter kit"
+  },
+  {
+    "id": 29,
+    "fraudulent": 1,
+    "text": "Crypto investment company hiring money transfer agents send funds through your personal account"
+  },
+  {
+    "id": 30,
+    "fraudulent": 1,
+    "text": "No interview needed instant hiring work from anywhere send copies of identity documents by chat"
+  },
+  {
+    "id": 31,
+    "fraudulent": 1,
+    "text": "Deposit this cashier check purchase gift cards and send codes to your hiring manager"
+  },
+  {
+    "id": 32,
+    "fraudulent": 1,
+    "text": "Secret shopper job requires upfront payment for your background check guaranteed placement"
+  },
+  {
+    "id": 33,
+    "fraudulent": 1,
+    "text": "Recruiter asks for your bank login to set up direct deposit before an interview"
+  },
+  {
+    "id": 34,
+    "fraudulent": 1,
+    "text": "Work remotely receive and forward parcels using your home address earn easy cash"
+  },
+  {
+    "id": 35,
+    "fraudulent": 1,
+    "text": "Pay a refundable application deposit by cryptocurrency to reserve this high paying job"
+  },
+  {
+    "id": 36,
+    "fraudulent": 1,
+    "text": "Limited time offer no qualifications needed send a fee to unlock the job description"
+  },
+  {
+    "id": 37,
+    "fraudulent": 1,
+    "text": "We hire instantly via messaging app provide your tax number and pay processing charge"
+  },
+  {
+    "id": 38,
+    "fraudulent": 1,
+    "text": "Earn passive income by accepting money transfers through your personal bank account"
+  },
+  {
+    "id": 39,
+    "fraudulent": 1,
+    "text": "Amazing salary for easy work no interview required purchase our mandatory starter package"
+  },
+  {
+    "id": 40,
+    "fraudulent": 1,
+    "text": "Urgent opportunity send your identity documents and account number before we reveal employer"
+  }
+]

@@ -10,7 +10,8 @@ let currentUserId = null;
 let userButtonMounted = false;
 let signInMounted = false;
 let currentAnalysisId = '';
-let currentModelVersion = '2.1.0';
+let currentModelVersion = '3.0.0';
+let currentSelectedModel = 'Loading classifier';
 
 function mountSignIn() {
   if (signInMounted) return;
@@ -158,7 +159,7 @@ function saveHistory(result, listingText, listingUrl) {
     risk:result.risk,
     riskLevel:result.riskLevel,
     verdict:result.verdict,
-    modelAgreement:result.modelAgreement,
+    scoreLabel:result.scoreLabel,
     redFlags:result.redFlags || [],
     explanations:result.explanations || [],
     positiveSignals:result.positiveSignals || [],
@@ -176,6 +177,7 @@ function resetResult() {
   currentAnalysisId = '';
   document.querySelector('#resultCard').classList.remove('done');
   document.querySelector('#resultCard').innerHTML = `<div class="result-top"><span>ANALYSIS RESULT</span><span class="result-icon">&#9673;</span></div><div class="empty-state"><div class="scan-art"><div class="scan-circle">&#8987;</div><div class="scan-line"></div><div class="scan-line short"></div></div><h3>Your results will show up here</h3><p>We’ll check for patterns that commonly appear in fraudulent job listings.</p></div><div class="result-foot"><span>MODEL</span><b>Ensemble classifier</b></div>`;
+  document.querySelector('#resultCard .result-foot b').textContent = currentSelectedModel;
 }
 
 document.querySelector('#jobText').addEventListener('input', () => {
@@ -262,9 +264,9 @@ document.querySelector('#analyzeBtn').onclick = async () => {
 function renderComparison(result) {
   const models = Array.isArray(result.comparison) ? result.comparison : [];
   if (!models.length) return '';
-  const rows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${model.accuracy}%</td><td>${model.precision}%</td><td>${model.recall}%</td><td>${model.f1}%</td></tr>`).join('');
+  const rows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${model.accuracy}%</td><td>${model.precision}%</td><td>${model.recall}%</td><td>${model.f1}%</td><td>${model.prAuc}%</td></tr>`).join('');
   const matrices = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${model.confusionMatrix?.tp ?? 0}</td><td>${model.confusionMatrix?.fp ?? 0}</td><td>${model.confusionMatrix?.fn ?? 0}</td><td>${model.confusionMatrix?.tn ?? 0}</td></tr>`).join('');
-  return `<details class="model-comparison"><summary>Compare classifiers</summary><p>${escapeHtml(result.evaluation?.method || 'Cross-validation')} on ${result.evaluation?.examples || result.trainingExamples} illustrative examples. These metrics are educational and do not represent real-world accuracy.</p><div class="table-scroll"><table class="metrics-table"><thead><tr><th>Model</th><th>Acc.</th><th>Prec.</th><th>Recall</th><th>F1</th></tr></thead><tbody>${rows}</tbody></table></div><details class="matrix-details"><summary>Confusion matrix counts</summary><div class="table-scroll"><table class="metrics-table matrix-table"><thead><tr><th>Model</th><th>TP</th><th>FP</th><th>FN</th><th>TN</th></tr></thead><tbody>${matrices}</tbody></table></div><small>Positive class = fake listing. TP/FP/FN/TN are cross-validation counts.</small></details></details>`;
+  return `<details class="model-comparison"><summary>Compare classifiers</summary><p>${escapeHtml(result.evaluation?.method || 'Held-out evaluation')} on ${Number(result.evaluation?.examples || 0).toLocaleString()} unseen listings. Precision, recall, F1, and PR-AUC refer to the fake class.</p><div class="table-scroll"><table class="metrics-table"><thead><tr><th>Model</th><th>Acc.</th><th>Prec.</th><th>Recall</th><th>F1</th><th>PR-AUC</th></tr></thead><tbody>${rows}</tbody></table></div><details class="matrix-details"><summary>Confusion matrix counts</summary><div class="table-scroll"><table class="metrics-table matrix-table"><thead><tr><th>Model</th><th>TP</th><th>FP</th><th>FN</th><th>TN</th></tr></thead><tbody>${matrices}</tbody></table></div><small>Positive class = fake listing. Counts come from the held-out test split.</small></details></details>`;
 }
 
 function downloadReport(result) {
@@ -276,7 +278,7 @@ function downloadReport(result) {
     '',
     `Risk level: ${result.riskLevel || 'Not available'}`,
     `Risk score: ${result.risk}/100`,
-    `Model agreement (not calibrated confidence): ${result.modelAgreement ?? 'Not available'}%`,
+    `Model score: ${result.risk}/100 (not a verified real-world probability)`,
     `Assessment: ${result.verdict}`,
     `Classifier: ${result.model}`,
     '',
@@ -286,10 +288,10 @@ function downloadReport(result) {
     'OTHER LISTING DETAILS:',
     ...(result.positiveSignals?.length ? result.positiveSignals.map(item => `- ${item.label}: “${item.evidence}”.`) : ['- No listed positive pattern matched.']),
     '',
-    'MODEL COMPARISON (5-FOLD CROSS-VALIDATION):',
-    ...(result.comparison || []).map(model => `- ${model.name}: accuracy ${model.accuracy}%, precision ${model.precision}%, recall ${model.recall}%, F1 ${model.f1}%`),
+    'MODEL COMPARISON (HELD-OUT TEST SPLIT; FAKE CLASS):',
+    ...(result.comparison || []).map(model => `- ${model.name}: accuracy ${model.accuracy}%, precision ${model.precision}%, recall ${model.recall}%, F1 ${model.f1}%, PR-AUC ${model.prAuc}%`),
     '',
-    'LIMITATION: This educational demo uses a small illustrative corpus. Its score is not proof that a job is fake or legitimate. Verify the employer independently. The job description text is not included in this report.'
+    'LIMITATION: EMSCAD postings date from 2012–2014. The score is not proof that a job is fake or legitimate. Verify the employer independently. The job description text is not included in this report.'
   ];
   const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
   const link = document.createElement('a');
@@ -332,9 +334,6 @@ function render(result, options = {}) {
     ? result.redFlags.map(flag => `<div class="flag"><span>&#9650;</span>${escapeHtml(flag)}</div>`).join('')
     : '<div class="flag clear"><span>&#10003;</span>No strong scam patterns found in the text</div>';
   const riskLevel = result.riskLevel || (result.risk >= 65 ? 'High' : result.risk >= 40 ? 'Medium' : 'Low');
-  const agreementLine = Number.isFinite(result.modelAgreement)
-    ? `Model agreement · ${result.modelAgreement}% (uncalibrated)`
-    : 'Model agreement unavailable for this saved result';
   const explanations = result.explanations?.length
     ? result.explanations.map(item => `<li><b>${escapeHtml(item.label)}</b><span class="evidence-caption">Matched phrase</span><mark class="evidence-highlight">“${escapeHtml(item.evidence)}”</mark><small>${escapeHtml(item.advice || '')}</small></li>`).join('')
     : '<li><b>No strong known scam phrase matched</b><span>The model score is based on language patterns in the full listing.</span><small>Check the employer and application link independently.</small></li>';
@@ -343,8 +342,8 @@ function render(result, options = {}) {
   const card = document.querySelector('#resultCard');
   card.dataset.risk = result.risk;
   card.classList.add('done');
-  card.innerHTML = `<div class="result-top"><span>ANALYSIS RESULT</span><span class="result-icon">&#9673;</span></div><div class="score-head"><div class="score-ring" style="--risk:${result.risk};--score-color:${color}"><span>${result.risk}</span></div><div class="score-copy"><span class="risk-chip risk-${riskLevel.toLowerCase()}">${escapeHtml(riskLevel)} risk</span><div class="score-title">${escapeHtml(result.verdict)}</div><div class="score-sub">Risk score · demo estimate, not a probability</div><div class="agreement-score" title="Average agreement between the Naive Bayes, Logistic Regression, and Linear SVM scores; not calibrated confidence.">${escapeHtml(agreementLine)}</div></div></div><div class="eyebrow section-label">SIGNALS FOUND</div><div class="flag-list">${flags}</div><details class="explanation" open><summary>Why this score?</summary><ul>${explanations}</ul>${positiveSignals}<p class="caveat">Exact matched phrases are highlighted. This is a screening signal, not proof; verify the employer directly.</p></details>${renderComparison(result)}<div class="result-actions"><button id="copyResult">Copy summary</button><button id="downloadReport">Download report</button><button id="againResult">Check another</button></div><div class="feedback-panel"><b>Was this result helpful?</b><div class="feedback-votes"><button type="button" data-feedback="helpful">Yes</button><button type="button" data-feedback="not-helpful">No</button><select id="feedbackReason" aria-label="Optional feedback reason"><option value="">Optional reason</option><option value="false-alarm">It flagged a legitimate listing</option><option value="missed-signal">It missed a warning sign</option><option value="unclear-score">The score was unclear</option></select><button type="button" id="saveFeedback" disabled>Save</button></div><small id="feedbackMessage">Feedback stays in this browser and is not sent to a server.</small></div><div class="result-foot" style="margin-top:13px"><span>MODEL v${escapeHtml(currentModelVersion)} · ${result.trainingExamples} EXAMPLES</span><b>${result.signals} text signals</b></div>`;
-  document.querySelector('#copyResult').onclick = () => navigator.clipboard?.writeText(`${riskLevel} risk (${result.risk}/100; model agreement ${result.modelAgreement ?? 'n/a'}%). ${result.redFlags?.join('; ') || 'No strong known pattern matched.'}`).then(() => notify('Summary copied.')).catch(() => notify('Copy unavailable in this browser.'));
+  card.innerHTML = `<div class="result-top"><span>ANALYSIS RESULT</span><span class="result-icon">&#9673;</span></div><div class="score-head"><div class="score-ring" style="--risk:${result.risk};--score-color:${color}"><span>${result.risk}</span></div><div class="score-copy"><span class="risk-chip risk-${riskLevel.toLowerCase()}">${escapeHtml(riskLevel)} risk</span><div class="score-title">${escapeHtml(result.verdict)}</div><div class="score-sub">${escapeHtml(result.scoreLabel || 'Uncalibrated model score, not a probability')}</div><div class="agreement-score">Model decision threshold · ${Math.round(Number(result.threshold || 0.5) * 100)}%</div></div></div><div class="eyebrow section-label">SIGNALS FOUND</div><div class="flag-list">${flags}</div><details class="explanation" open><summary>Why this score?</summary><ul>${explanations}</ul>${positiveSignals}<p class="caveat">Exact matched phrases are highlighted. This is a screening signal, not proof; verify the employer directly.</p></details>${renderComparison(result)}<div class="result-actions"><button id="copyResult">Copy summary</button><button id="downloadReport">Download report</button><button id="againResult">Check another</button></div><div class="feedback-panel"><b>Was this result helpful?</b><div class="feedback-votes"><button type="button" data-feedback="helpful">Yes</button><button type="button" data-feedback="not-helpful">No</button><select id="feedbackReason" aria-label="Optional feedback reason"><option value="">Optional reason</option><option value="false-alarm">It flagged a legitimate listing</option><option value="missed-signal">It missed a warning sign</option><option value="unclear-score">The score was unclear</option></select><button type="button" id="saveFeedback" disabled>Save</button></div><small id="feedbackMessage">Feedback stays in this browser and is not sent to a server.</small></div><div class="result-foot" style="margin-top:13px"><span>MODEL v${escapeHtml(currentModelVersion)} · ${Number(result.trainingExamples || 0).toLocaleString()} LISTINGS</span><b>${Number(result.signals || 0).toLocaleString()} text signals</b></div>`;
+  document.querySelector('#copyResult').onclick = () => navigator.clipboard?.writeText(`${riskLevel} risk (${result.risk}/100; score is not a calibrated probability). ${result.redFlags?.join('; ') || 'No strong known pattern matched.'}`).then(() => notify('Summary copied.')).catch(() => notify('Copy unavailable in this browser.'));
   document.querySelector('#downloadReport').onclick = () => downloadReport(result);
   document.querySelector('#againResult').onclick = () => {
     text.value = '';
@@ -398,17 +397,22 @@ function escapeHtml(value) {
 }
 
 function renderModelInfo(info) {
-  currentModelVersion = String(info.version || '2.1.0');
+  currentModelVersion = String(info.version || '3.0.0');
+  currentSelectedModel = String(info.selectedModel || 'Text classifier');
   document.querySelector('#modelVersion').textContent = `v${currentModelVersion}`;
   const updated = new Date(`${info.updatedAt || '2026-11-21'}T12:00:00`).toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric'});
   document.querySelector('#modelUpdated').textContent = `UPDATED ${updated.toUpperCase()}`;
   const models = Array.isArray(info.models) ? info.models : [];
   const percent = value => `${Number(value || 0)}%`;
-  const modelRows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${percent(model.accuracy)}</td><td>${percent(model.precision)}</td><td>${percent(model.recall)}</td><td>${percent(model.f1)}</td></tr>`).join('');
+  const modelRows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}${model.name === info.selectedModel ? ' <small>(live)</small>' : ''}</th><td>${percent(model.accuracy)}</td><td>${percent(model.precision)}</td><td>${percent(model.recall)}</td><td>${percent(model.f1)}</td><td>${percent(model.prAuc)}</td></tr>`).join('');
   const matrixRows = models.map(model => `<tr><th scope="row">${escapeHtml(model.name)}</th><td>${Number(model.confusionMatrix?.tp || 0)}</td><td>${Number(model.confusionMatrix?.fp || 0)}</td><td>${Number(model.confusionMatrix?.fn || 0)}</td><td>${Number(model.confusionMatrix?.tn || 0)}</td></tr>`).join('');
   const limitations = (info.limitations || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');
   const dataset = info.dataset || {};
-  document.querySelector('#modelInfoBody').innerHTML = `<div class="model-intro"><p><b>${escapeHtml(dataset.name || 'JobShield demo corpus')}</b> contains ${Number(dataset.total || 0)} labeled examples: ${Number(dataset.legitimateStyle || 0)} legitimate-style and ${Number(dataset.fakeStyle || 0)} fake-style.</p><p>${escapeHtml(dataset.source || '')}</p></div><div class="model-stat-grid"><div><span>MODEL VERSION</span><b>v${escapeHtml(currentModelVersion)}</b></div><div><span>LAST UPDATED</span><b>${escapeHtml(updated)}</b></div><div><span>EVALUATION</span><b>${escapeHtml(info.evaluation?.method || 'Not available')}</b></div><div><span>ENSEMBLE</span><b>${(info.ensemble || []).map(escapeHtml).join(' + ')}</b></div></div><h3>Cross-validation results</h3><p class="model-method">Positive class: <b>${escapeHtml(info.evaluation?.positiveClass || 'Fake job post')}</b>. ${escapeHtml(info.evaluation?.note || '')}</p><div class="table-scroll"><table class="metrics-table model-card-table"><thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead><tbody>${modelRows}</tbody></table></div><h3>Confusion matrix counts</h3><p class="model-method">Across all ${Number(info.evaluation?.examples || 0)} cross-validated predictions. TP/FP/FN/TN are for the fake-job positive class.</p><div class="table-scroll"><table class="metrics-table matrix-table model-card-table"><thead><tr><th>Model</th><th>TP</th><th>FP</th><th>FN</th><th>TN</th></tr></thead><tbody>${matrixRows}</tbody></table></div><details class="model-limitations" open><summary>Limitations</summary><ul>${limitations}</ul></details><p class="model-disclaimer">These metrics describe this small demo corpus only. They should not be presented as validated real-world performance.</p>`;
+  const total = Number(dataset.rowsAfterCleaning || 0);
+  const legitimate = Number(dataset.legitimate || 0);
+  const fake = Number(dataset.fake || 0);
+  const liveModel = escapeHtml(info.selectedModel || 'Selected classifier');
+  document.querySelector('#modelInfoBody').innerHTML = `<div class="model-intro"><p><b>${escapeHtml(dataset.name || 'Dataset')}</b> contains ${total.toLocaleString()} unique usable listings after cleaning: ${legitimate.toLocaleString()} legitimate and ${fake.toLocaleString()} fake (${total ? (fake / total * 100).toFixed(2) : '0.00'}% fake).</p><p>Data: <a href="${escapeHtml(dataset.source || '#')}" target="_blank" rel="noreferrer">Kaggle dataset</a> · Research: <a href="${escapeHtml(dataset.paper || '#')}" target="_blank" rel="noreferrer">EMSCAD paper</a> · ${escapeHtml(dataset.license || '')}</p><p>${Number(dataset.duplicateTextsRemoved || 0).toLocaleString()} duplicate texts removed before the split; ${Number(dataset.conflictingDuplicateRowsRemoved || 0).toLocaleString()} rows with conflicting duplicate labels excluded.</p></div><div class="model-stat-grid"><div><span>MODEL VERSION</span><b>v${escapeHtml(currentModelVersion)}</b></div><div><span>LAST UPDATED</span><b>${escapeHtml(updated)}</b></div><div><span>LIVE CLASSIFIER</span><b>${liveModel}</b></div><div><span>TEST SPLIT</span><b>${Number(info.evaluation?.examples || 0).toLocaleString()} listings</b></div></div><h3>Held-out test results</h3><p class="model-method">${escapeHtml(info.evaluation?.method || 'Not available')}. Positive class: <b>${escapeHtml(info.evaluation?.positiveClass || 'Fake job post')}</b>. Precision, recall, F1, and PR-AUC refer to fake listings. The live classifier was selected using a separate validation split inside the training data; the test split was not used to choose it.</p><div class="table-scroll"><table class="metrics-table model-card-table"><thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>PR-AUC</th></tr></thead><tbody>${modelRows}</tbody></table></div><h3>Confusion matrices</h3><p class="model-method">Counts across the same ${Number(info.evaluation?.examples || 0).toLocaleString()} held-out listings. TP/FP/FN/TN are for the fake-job positive class.</p><div class="table-scroll"><table class="metrics-table matrix-table model-card-table"><thead><tr><th>Model</th><th>TP</th><th>FP</th><th>FN</th><th>TN</th></tr></thead><tbody>${matrixRows}</tbody></table></div><details class="model-limitations" open><summary>Limitations</summary><ul>${limitations}</ul></details><p class="model-disclaimer">These results are from one holdout split of historical EMSCAD data. The selected model is ${liveModel}. Treat the score as a screening aid, not a guarantee.</p>`;
 }
 
 document.querySelector('#aboutModel').onclick = async event => {
@@ -430,5 +434,15 @@ document.querySelector('#closeModelInfo').onclick = () => document.querySelector
 document.querySelector('#modelInfoDialog').addEventListener('click', event => {
   if (event.target.id === 'modelInfoDialog') event.currentTarget.classList.add('hidden');
 });
+
+fetch('/api/analyze', {method:'GET', cache:'no-store'})
+  .then(response => response.json().then(info => ({response, info})))
+  .then(({response, info}) => {
+    if (!response.ok) throw new Error(info.error || 'Could not load model information.');
+    renderModelInfo(info);
+    const modelLabel = document.querySelector('#resultCard .result-foot b');
+    if (modelLabel) modelLabel.textContent = info.selectedModel || 'Text classifier';
+  })
+  .catch(() => {});
 
 initializeAuth();
